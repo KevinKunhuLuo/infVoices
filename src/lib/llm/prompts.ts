@@ -64,7 +64,7 @@ ${persona.traits && persona.traits.length > 0 ? `**性格特点**\n${persona.tra
 - **多选题 (multiple_choice)**：选项 value 值的数组，如 ["option_1", "option_3"]
 - **量表题 (scale)**：数字，如 4
 - **开放文本 (open_text)**：文字回答字符串
-- **图片对比 (image_compare)**：选中图片的标识，如 "image_0"
+- **图片对比 (image_compare)**：选中图片的标识，如 "image_0"。注意：你只能看到图片的文字描述，请根据描述做出符合你角色特征的选择
 - **概念测试 (concept_test)**：各维度评分的对象，如 {"dim1": 4, "dim2": 3}`;
 }
 

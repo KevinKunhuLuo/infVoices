@@ -53,7 +53,20 @@ export function PersonaChatDialog({
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  // 初始化欢迎消息
+  // 当 persona 变化时重置对话
+  useEffect(() => {
+    if (open) {
+      const welcomeMessage: ChatMessage = {
+        id: crypto.randomUUID(),
+        role: "assistant",
+        content: getWelcomeMessage(persona, questionContext),
+        timestamp: Date.now(),
+      };
+      setMessages([welcomeMessage]);
+    }
+  }, [persona.id]); // 只在 persona.id 变化时触发
+
+  // 对话框打开时初始化
   useEffect(() => {
     if (open && messages.length === 0) {
       const welcomeMessage: ChatMessage = {
@@ -64,7 +77,7 @@ export function PersonaChatDialog({
       };
       setMessages([welcomeMessage]);
     }
-  }, [open, persona, questionContext]);
+  }, [open]);
 
   // 滚动到底部
   useEffect(() => {

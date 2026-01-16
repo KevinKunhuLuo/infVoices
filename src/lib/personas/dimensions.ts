@@ -181,9 +181,109 @@ export const dimensionMap = new Map<string, Dimension>(
 );
 
 // ============================================
-// 城市示例数据（用于生成角色）
+// 城市数据（按地区和线级组织）
 // ============================================
 
+// 城市到地区的映射
+export interface CityInfo {
+  name: string;
+  tier: string;
+  region: string;
+}
+
+// 按地区组织的城市数据
+export const citiesByRegion: Record<string, CityInfo[]> = {
+  "beijing-tianjin-hebei": [
+    { name: "北京", tier: "tier1", region: "beijing-tianjin-hebei" },
+    { name: "天津", tier: "newTier1", region: "beijing-tianjin-hebei" },
+    { name: "石家庄", tier: "tier2", region: "beijing-tianjin-hebei" },
+    { name: "保定", tier: "tier3", region: "beijing-tianjin-hebei" },
+    { name: "邯郸", tier: "tier4plus", region: "beijing-tianjin-hebei" },
+    { name: "唐山", tier: "tier3", region: "beijing-tianjin-hebei" },
+    { name: "廊坊", tier: "tier4plus", region: "beijing-tianjin-hebei" },
+  ],
+  "yangtze-delta": [
+    { name: "上海", tier: "tier1", region: "yangtze-delta" },
+    { name: "杭州", tier: "newTier1", region: "yangtze-delta" },
+    { name: "南京", tier: "newTier1", region: "yangtze-delta" },
+    { name: "苏州", tier: "newTier1", region: "yangtze-delta" },
+    { name: "宁波", tier: "newTier1", region: "yangtze-delta" },
+    { name: "无锡", tier: "tier2", region: "yangtze-delta" },
+    { name: "合肥", tier: "tier2", region: "yangtze-delta" },
+    { name: "温州", tier: "tier2", region: "yangtze-delta" },
+    { name: "金华", tier: "tier3", region: "yangtze-delta" },
+    { name: "台州", tier: "tier3", region: "yangtze-delta" },
+    { name: "绍兴", tier: "tier3", region: "yangtze-delta" },
+    { name: "嘉兴", tier: "tier3", region: "yangtze-delta" },
+    { name: "南通", tier: "tier3", region: "yangtze-delta" },
+    { name: "扬州", tier: "tier3", region: "yangtze-delta" },
+    { name: "徐州", tier: "tier3", region: "yangtze-delta" },
+    { name: "盐城", tier: "tier4plus", region: "yangtze-delta" },
+    { name: "芜湖", tier: "tier4plus", region: "yangtze-delta" },
+  ],
+  "pearl-delta": [
+    { name: "广州", tier: "tier1", region: "pearl-delta" },
+    { name: "深圳", tier: "tier1", region: "pearl-delta" },
+    { name: "东莞", tier: "newTier1", region: "pearl-delta" },
+    { name: "佛山", tier: "newTier1", region: "pearl-delta" },
+    { name: "厦门", tier: "tier2", region: "pearl-delta" },
+    { name: "福州", tier: "tier2", region: "pearl-delta" },
+    { name: "泉州", tier: "tier2", region: "pearl-delta" },
+    { name: "珠海", tier: "tier3", region: "pearl-delta" },
+    { name: "惠州", tier: "tier3", region: "pearl-delta" },
+    { name: "中山", tier: "tier3", region: "pearl-delta" },
+    { name: "漳州", tier: "tier4plus", region: "pearl-delta" },
+    { name: "湛江", tier: "tier4plus", region: "pearl-delta" },
+  ],
+  "sichuan-chongqing": [
+    { name: "成都", tier: "newTier1", region: "sichuan-chongqing" },
+    { name: "重庆", tier: "newTier1", region: "sichuan-chongqing" },
+    { name: "贵阳", tier: "tier2", region: "sichuan-chongqing" },
+    { name: "昆明", tier: "tier2", region: "sichuan-chongqing" },
+    { name: "绵阳", tier: "tier3", region: "sichuan-chongqing" },
+    { name: "宜宾", tier: "tier4plus", region: "sichuan-chongqing" },
+    { name: "曲靖", tier: "tier4plus", region: "sichuan-chongqing" },
+  ],
+  central: [
+    { name: "武汉", tier: "newTier1", region: "central" },
+    { name: "郑州", tier: "newTier1", region: "central" },
+    { name: "长沙", tier: "newTier1", region: "central" },
+    { name: "南昌", tier: "tier2", region: "central" },
+    { name: "济南", tier: "tier2", region: "central" },
+    { name: "太原", tier: "tier3", region: "central" },
+    { name: "洛阳", tier: "tier4plus", region: "central" },
+    { name: "襄阳", tier: "tier4plus", region: "central" },
+    { name: "宜昌", tier: "tier4plus", region: "central" },
+    { name: "赣州", tier: "tier4plus", region: "central" },
+    { name: "衡阳", tier: "tier4plus", region: "central" },
+  ],
+  northeast: [
+    { name: "沈阳", tier: "newTier1", region: "northeast" },
+    { name: "大连", tier: "tier2", region: "northeast" },
+    { name: "哈尔滨", tier: "tier2", region: "northeast" },
+    { name: "长春", tier: "tier2", region: "northeast" },
+    { name: "鞍山", tier: "tier4plus", region: "northeast" },
+    { name: "吉林", tier: "tier4plus", region: "northeast" },
+  ],
+  northwest: [
+    { name: "西安", tier: "newTier1", region: "northwest" },
+    { name: "兰州", tier: "tier3", region: "northwest" },
+    { name: "西宁", tier: "tier4plus", region: "northwest" },
+    { name: "银川", tier: "tier4plus", region: "northwest" },
+    { name: "乌鲁木齐", tier: "tier3", region: "northwest" },
+  ],
+  other: [
+    { name: "青岛", tier: "newTier1", region: "other" },
+    { name: "南宁", tier: "tier2", region: "other" },
+    { name: "海口", tier: "tier3", region: "other" },
+    { name: "烟台", tier: "tier3", region: "other" },
+    { name: "潍坊", tier: "tier3", region: "other" },
+    { name: "桂林", tier: "tier4plus", region: "other" },
+    { name: "三亚", tier: "tier4plus", region: "other" },
+  ],
+};
+
+// 兼容旧代码的城市列表（按线级）
 export const citiesByTier: Record<string, string[]> = {
   tier1: ["北京", "上海", "广州", "深圳"],
   newTier1: [
@@ -206,6 +306,38 @@ export const citiesByTier: Record<string, string[]> = {
     "宜昌", "邯郸", "赣州", "衡阳", "桂林", "曲靖",
   ],
 };
+
+/**
+ * 根据地区和城市线级获取匹配的城市
+ */
+export function getCitiesByRegionAndTier(region: string, cityTier: string): CityInfo[] {
+  const regionCities = citiesByRegion[region] || citiesByRegion.other;
+  const matchingCities = regionCities.filter(city => city.tier === cityTier);
+
+  // 如果该地区没有对应线级的城市，返回相近线级的城市
+  if (matchingCities.length === 0) {
+    // 按优先级尝试相近的线级
+    const tierPriority: Record<string, string[]> = {
+      tier1: ["newTier1", "tier2", "tier3", "tier4plus"],
+      newTier1: ["tier1", "tier2", "tier3", "tier4plus"],
+      tier2: ["newTier1", "tier3", "tier1", "tier4plus"],
+      tier3: ["tier2", "tier4plus", "newTier1", "tier1"],
+      tier4plus: ["tier3", "tier2", "newTier1", "tier1"],
+    };
+
+    for (const fallbackTier of tierPriority[cityTier] || []) {
+      const fallbackCities = regionCities.filter(city => city.tier === fallbackTier);
+      if (fallbackCities.length > 0) {
+        return fallbackCities;
+      }
+    }
+
+    // 如果都没有，返回该地区的所有城市
+    return regionCities;
+  }
+
+  return matchingCities;
+}
 
 // ============================================
 // 中文姓名生成数据

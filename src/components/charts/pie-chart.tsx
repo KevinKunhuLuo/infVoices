@@ -39,11 +39,11 @@ const DEFAULT_COLORS = [
   "oklch(70% 0.15 330)",
 ];
 
-// Size presets
+// Size presets - increased heights to accommodate legends with multiple items
 const SIZE_CONFIG = {
-  sm: { height: 160, outerRadius: 55, innerRadius: 25 },
-  md: { height: 240, outerRadius: 80, innerRadius: 40 },
-  lg: { height: 300, outerRadius: 100, innerRadius: 50 },
+  sm: { height: 200, outerRadius: 50, innerRadius: 20, legendHeight: 60 },
+  md: { height: 280, outerRadius: 75, innerRadius: 35, legendHeight: 50 },
+  lg: { height: 340, outerRadius: 95, innerRadius: 45, legendHeight: 60 },
 };
 
 // 自定义标签
@@ -180,6 +180,7 @@ export function PieChartComponent({
   const height = customHeight || sizeConfig.height;
   const outerRadius = customOuterRadius || sizeConfig.outerRadius;
   const innerRadius = customInnerRadius ?? sizeConfig.innerRadius;
+  const baseLegendHeight = sizeConfig.legendHeight || 50;
 
   const chartData = useMemo(() => {
     return data.map((item, index) => ({
@@ -200,13 +201,15 @@ export function PieChartComponent({
   }, [chartData, total]);
 
   // 计算图表区域高度（减去图例和标题）
-  const legendHeight = showLegend ? 36 : 0;
+  // 动态计算图例高度，每行约20px，最多显示3行
+  const estimatedLegendRows = Math.min(Math.ceil(data.length / 3), 3);
+  const legendHeight = showLegend ? Math.max(baseLegendHeight, estimatedLegendRows * 22) : 0;
   const titleHeight = title ? 24 : 0;
   const chartAreaHeight = height - legendHeight - titleHeight;
   const centerY = chartAreaHeight / 2;
 
   return (
-    <div className={cn("w-full overflow-hidden", className)} style={{ height }}>
+    <div className={cn("w-full", className)} style={{ height }}>
       {title && (
         <h3 className="text-sm font-medium text-center mb-1 truncate px-2">{title}</h3>
       )}
@@ -242,7 +245,12 @@ export function PieChartComponent({
               height={legendHeight}
               iconType="circle"
               iconSize={8}
-              wrapperStyle={{ paddingTop: 8 }}
+              wrapperStyle={{
+                paddingTop: 8,
+                paddingLeft: 8,
+                paddingRight: 8,
+                lineHeight: '1.8',
+              }}
               formatter={(value, entry) => {
                 const item = dataWithPercentage.find(d => d.name === value);
                 return (

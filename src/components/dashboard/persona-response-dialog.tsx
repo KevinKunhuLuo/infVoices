@@ -144,7 +144,7 @@ function PersonaCard({
           >
             <div className="px-4 pb-4 space-y-4 border-t pt-4">
               {/* 人口学详情 */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                 <DetailItem icon={GraduationCap} label="学历" value={persona.education} />
                 <DetailItem icon={DollarSign} label="收入" value={persona.incomeLevel} />
                 <DetailItem icon={Briefcase} label="职业" value={persona.occupation} />
@@ -222,10 +222,10 @@ function DetailItem({
   value: string;
 }) {
   return (
-    <div className="flex items-center gap-2 text-sm">
-      <Icon className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-      <span className="text-muted-foreground">{label}:</span>
-      <span className="font-medium truncate">{value}</span>
+    <div className="flex items-start gap-2 text-sm">
+      <Icon className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+      <span className="text-muted-foreground whitespace-nowrap">{label}:</span>
+      <span className="font-medium">{value}</span>
     </div>
   );
 }
@@ -308,7 +308,7 @@ export function PersonaResponseDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
+      <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="pr-8">
             <span className="text-muted-foreground text-sm font-normal block mb-1">

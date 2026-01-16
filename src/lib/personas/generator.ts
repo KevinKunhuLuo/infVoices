@@ -8,10 +8,12 @@ import {
   allDimensions,
   dimensionMap,
   citiesByTier,
+  getCitiesByRegionAndTier,
   surnames,
   maleNames,
   femaleNames,
   type DimensionOption,
+  type CityInfo,
 } from "./dimensions";
 
 // ============================================
@@ -80,9 +82,15 @@ function generateAge(ageRange: string): number {
 }
 
 /**
- * 根据城市线级生成具体城市
+ * 根据地区和城市线级生成具体城市
+ * 确保城市与地区匹配
  */
-function generateCity(cityTier: string): string {
+function generateCity(region: string, cityTier: string): string {
+  const matchingCities = getCitiesByRegionAndTier(region, cityTier);
+  if (matchingCities.length > 0) {
+    return randomChoice(matchingCities).name;
+  }
+  // 最终fallback到旧逻辑
   const cities = citiesByTier[cityTier] || citiesByTier.tier3;
   return randomChoice(cities);
 }
@@ -248,7 +256,7 @@ export function generatePersona(
 
   // 构建角色对象
   const age = generateAge(selectedValues.ageRange);
-  const city = generateCity(selectedValues.cityTier);
+  const city = generateCity(selectedValues.region, selectedValues.cityTier);
   const income = generateIncome(selectedValues.incomeLevel);
 
   const persona: Persona = {
