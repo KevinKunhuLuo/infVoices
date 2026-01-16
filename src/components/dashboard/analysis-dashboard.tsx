@@ -133,15 +133,15 @@ export function AnalysisDashboard({ report, onExport }: AnalysisDashboardProps) 
 
       {/* 主要内容区域 */}
       <motion.div variants={staggerItem}>
-        <Tabs defaultValue="demographics" className="space-y-4">
+        <Tabs defaultValue="questions" className="space-y-4">
           <TabsList className="grid w-full grid-cols-3 lg:w-auto lg:inline-grid">
-            <TabsTrigger value="demographics" className="gap-2">
-              <Users className="h-4 w-4" />
-              人口分布
-            </TabsTrigger>
             <TabsTrigger value="questions" className="gap-2">
               <BarChart3 className="h-4 w-4" />
               问题分析
+            </TabsTrigger>
+            <TabsTrigger value="demographics" className="gap-2">
+              <Users className="h-4 w-4" />
+              人口分布
             </TabsTrigger>
             <TabsTrigger value="insights" className="gap-2">
               <TrendingUp className="h-4 w-4" />
@@ -207,13 +207,15 @@ export function AnalysisDashboard({ report, onExport }: AnalysisDashboardProps) 
                           <PieChartComponent
                             data={demographicChartData}
                             title={currentDemographic?.label}
-                            innerRadius={50}
+                            size="lg"
+                            showLabels={true}
                           />
                         ) : (
                           <BarChartComponent
                             data={demographicChartData}
                             title={currentDemographic?.label}
                             horizontal
+                            showLabels
                           />
                         )}
                       </motion.div>
@@ -259,21 +261,20 @@ export function AnalysisDashboard({ report, onExport }: AnalysisDashboardProps) 
                 .filter((d) => d.dimension !== selectedDemographic)
                 .slice(0, 5)
                 .map((demo) => (
-                  <Card key={demo.dimension} className="hover:shadow-md transition-shadow">
+                  <Card key={demo.dimension} className="hover:shadow-md transition-shadow overflow-hidden">
                     <CardHeader className="pb-2">
                       <CardTitle className="text-sm">{demo.label}</CardTitle>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="pb-4">
                       <PieChartComponent
                         data={demo.segments.map((s) => ({
                           name: s.label,
                           value: s.count,
                           color: s.color,
                         }))}
-                        showLegend={false}
+                        showLegend={true}
                         showLabels={false}
-                        innerRadius={30}
-                        className="h-[160px]"
+                        size="sm"
                       />
                     </CardContent>
                   </Card>
@@ -429,7 +430,7 @@ function QuestionAnalysisCard({
               ) : stats.questionType === "scale" ? (
                 <BarChartComponent data={chartData} showLabels />
               ) : (
-                <PieChartComponent data={chartData} innerRadius={40} />
+                <PieChartComponent data={chartData} size="md" showLabels={true} />
               )}
             </div>
 

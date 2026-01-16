@@ -22,6 +22,9 @@ interface PieChartProps {
   showLegend?: boolean;
   showLabels?: boolean;
   innerRadius?: number;
+  outerRadius?: number;
+  height?: number;
+  size?: "sm" | "md" | "lg";
   className?: string;
 }
 
@@ -36,6 +39,13 @@ const DEFAULT_COLORS = [
   "oklch(70% 0.15 330)",
 ];
 
+// Size presets
+const SIZE_CONFIG = {
+  sm: { height: 160, outerRadius: 55, innerRadius: 25 },
+  md: { height: 240, outerRadius: 80, innerRadius: 40 },
+  lg: { height: 300, outerRadius: 100, innerRadius: 50 },
+};
+
 // 自定义标签
 const renderCustomLabel = (props: PieLabelRenderProps) => {
   const {
@@ -45,6 +55,7 @@ const renderCustomLabel = (props: PieLabelRenderProps) => {
     innerRadius,
     outerRadius,
     percent,
+    value,
   } = props;
 
   // Handle potential undefined values
@@ -73,9 +84,53 @@ const renderCustomLabel = (props: PieLabelRenderProps) => {
       fill="white"
       textAnchor="middle"
       dominantBaseline="central"
-      className="text-xs font-medium"
+      className="text-[10px] font-semibold"
+      style={{ textShadow: "0 1px 2px rgba(0,0,0,0.3)" }}
     >
       {`${(percent * 100).toFixed(0)}%`}
+    </text>
+  );
+};
+
+// 外部标签（显示数值）
+const renderOuterLabel = (props: PieLabelRenderProps) => {
+  const {
+    cx,
+    cy,
+    midAngle,
+    outerRadius,
+    percent,
+    value,
+    name,
+  } = props;
+
+  if (
+    typeof cx !== "number" ||
+    typeof cy !== "number" ||
+    typeof midAngle !== "number" ||
+    typeof outerRadius !== "number" ||
+    typeof percent !== "number"
+  ) {
+    return null;
+  }
+
+  if (percent < 0.03) return null;
+
+  const RADIAN = Math.PI / 180;
+  const radius = outerRadius + 20;
+  const x = cx + radius * Math.cos(-midAngle * RADIAN);
+  const y = cy + radius * Math.sin(-midAngle * RADIAN);
+
+  return (
+    <text
+      x={x}
+      y={y}
+      fill="currentColor"
+      textAnchor={x > cx ? "start" : "end"}
+      dominantBaseline="central"
+      className="text-[11px] fill-muted-foreground"
+    >
+      {value}
     </text>
   );
 };
@@ -115,9 +170,17 @@ export function PieChartComponent({
   title,
   showLegend = true,
   showLabels = true,
-  innerRadius = 0,
+  innerRadius: customInnerRadius,
+  outerRadius: customOuterRadius,
+  height: customHeight,
+  size = "md",
   className,
 }: PieChartProps) {
+  const sizeConfig = SIZE_CONFIG[size];
+  const height = customHeight || sizeConfig.height;
+  const outerRadius = customOuterRadius || sizeConfig.outerRadius;
+  const innerRadius = customInnerRadius ?? sizeConfig.innerRadius;
+
   const chartData = useMemo(() => {
     return data.map((item, index) => ({
       ...item,
@@ -136,20 +199,26 @@ export function PieChartComponent({
     }));
   }, [chartData, total]);
 
+  // 计算图表区域高度（减去图例和标题）
+  const legendHeight = showLegend ? 36 : 0;
+  const titleHeight = title ? 24 : 0;
+  const chartAreaHeight = height - legendHeight - titleHeight;
+  const centerY = chartAreaHeight / 2;
+
   return (
-    <div className={cn("w-full", className)}>
+    <div className={cn("w-full overflow-hidden", className)} style={{ height }}>
       {title && (
-        <h3 className="text-sm font-medium text-center mb-2">{title}</h3>
+        <h3 className="text-sm font-medium text-center mb-1 truncate px-2">{title}</h3>
       )}
-      <ResponsiveContainer width="100%" height={280}>
+      <ResponsiveContainer width="100%" height={height - titleHeight}>
         <RechartsPieChart>
           <Pie
             data={dataWithPercentage}
             cx="50%"
-            cy="50%"
+            cy={showLegend ? "45%" : "50%"}
             innerRadius={innerRadius}
-            outerRadius={100}
-            paddingAngle={2}
+            outerRadius={outerRadius}
+            paddingAngle={data.length > 1 ? 2 : 0}
             dataKey="value"
             nameKey="name"
             label={showLabels ? renderCustomLabel : false}
@@ -161,7 +230,8 @@ export function PieChartComponent({
               <Cell
                 key={`cell-${index}`}
                 fill={entry.fill}
-                stroke="transparent"
+                stroke="var(--background)"
+                strokeWidth={1}
               />
             ))}
           </Pie>
@@ -169,12 +239,18 @@ export function PieChartComponent({
           {showLegend && (
             <Legend
               verticalAlign="bottom"
-              height={36}
+              height={legendHeight}
               iconType="circle"
               iconSize={8}
-              formatter={(value) => (
-                <span className="text-xs text-muted-foreground">{value}</span>
-              )}
+              wrapperStyle={{ paddingTop: 8 }}
+              formatter={(value, entry) => {
+                const item = dataWithPercentage.find(d => d.name === value);
+                return (
+                  <span className="text-xs text-muted-foreground">
+                    {value} {item && <span className="font-medium text-foreground">({item.value})</span>}
+                  </span>
+                );
+              }}
             />
           )}
         </RechartsPieChart>
