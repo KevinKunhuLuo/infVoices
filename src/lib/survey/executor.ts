@@ -281,6 +281,7 @@ export class SurveyExecutor {
       } catch (error) {
         lastError = error as Error;
         attempts++;
+        console.error(`API call failed for ${entry.persona.name} (attempt ${attempts}):`, lastError.message);
 
         if (attempts <= this.config.retryAttempts) {
           await this.delay(this.config.retryDelay * attempts);
@@ -314,6 +315,7 @@ export class SurveyExecutor {
     }, this.config.timeout);
 
     try {
+      console.log("Fetching /api/survey/execute for", persona.name);
       const response = await fetch("/api/survey/execute", {
         method: "POST",
         headers: {
@@ -330,13 +332,16 @@ export class SurveyExecutor {
       });
 
       clearTimeout(timeoutId);
+      console.log("Response status:", response.status);
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `HTTP ${response.status}`);
+        const errorText = await response.text();
+        console.error("API error response:", errorText);
+        throw new Error(errorText || `HTTP ${response.status}`);
       }
 
       const data = await response.json();
+      console.log("API response data:", data.success);
 
       if (!data.success) {
         throw new Error(data.error || "API returned unsuccessful response");
@@ -345,6 +350,7 @@ export class SurveyExecutor {
       return data.data;
     } catch (error) {
       clearTimeout(timeoutId);
+      console.error("Fetch error:", error);
       throw error;
     }
   }
