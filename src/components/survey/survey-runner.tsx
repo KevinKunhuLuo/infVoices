@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Play,
@@ -50,6 +50,17 @@ export function SurveyRunner({
 }: SurveyRunnerProps) {
   const [isResponseListOpen, setIsResponseListOpen] = useState(true);
 
+  // 使用 ref 保持 onComplete 引用稳定
+  const onCompleteRef = useRef(onComplete);
+  onCompleteRef.current = onComplete;
+
+  // 稳定的 onEvent 回调
+  const handleEvent = useCallback((event: import("@/lib/survey/executor").ExecutionEvent) => {
+    if (event.type === "complete") {
+      onCompleteRef.current?.(event.results);
+    }
+  }, []);
+
   const {
     status,
     progress,
@@ -62,11 +73,7 @@ export function SurveyRunner({
     reset,
   } = useSurveyExecutor({
     config,
-    onEvent: (event) => {
-      if (event.type === "complete") {
-        onComplete?.(event.results);
-      }
-    },
+    onEvent: handleEvent,
   });
 
   const handleStart = async () => {

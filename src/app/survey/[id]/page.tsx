@@ -173,7 +173,7 @@ export default function SurveyDetailPage() {
   if (loading) {
     return (
       <>
-        <div className="container max-w-6xl py-8">
+        <div className="container max-w-6xl px-4 sm:px-6 lg:px-8 py-8 mx-auto">
           <div className="flex items-center justify-center h-64">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
           </div>
@@ -185,7 +185,7 @@ export default function SurveyDetailPage() {
   if (!survey) {
     return (
       <>
-        <div className="container max-w-6xl py-8">
+        <div className="container max-w-6xl px-4 sm:px-6 lg:px-8 py-8 mx-auto">
           <Card>
             <CardContent className="py-16 text-center">
               <AlertCircle className="h-16 w-16 mx-auto mb-4 text-muted-foreground opacity-50" />
@@ -206,7 +206,7 @@ export default function SurveyDetailPage() {
   return (
     <>
       <motion.div
-        className="container max-w-6xl py-8"
+        className="container max-w-6xl px-4 sm:px-6 lg:px-8 py-8 mx-auto"
         variants={staggerContainer}
         initial="hidden"
         animate="visible"
