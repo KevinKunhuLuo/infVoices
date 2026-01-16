@@ -42,13 +42,15 @@ export function useSurveyExecutor(
 ): UseSurveyExecutorReturn {
   const { config, onEvent } = options;
 
-  const executorRef = useRef<SurveyExecutor | null>(null);
+  // 使用 ref 存储选项，避免触发重新创建
+  const configRef = useRef(config);
   const onEventRef = useRef(onEvent);
+  const executorRef = useRef<SurveyExecutor | null>(null);
+  const listenerCleanupRef = useRef<(() => void) | null>(null);
 
-  // Keep onEvent ref updated without triggering effect re-runs
-  useEffect(() => {
-    onEventRef.current = onEvent;
-  }, [onEvent]);
+  // 更新 refs
+  configRef.current = config;
+  onEventRef.current = onEvent;
 
   const [status, setStatus] = useState<ExecutionStatus>("idle");
   const [progress, setProgress] = useState<ExecutionProgress>({
@@ -62,17 +64,11 @@ export function useSurveyExecutor(
   const [responses, setResponses] = useState<ResponseEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  // 初始化执行器 - only recreate when config changes (using JSON comparison)
-  const configRef = useRef(config);
-  const configChanged = JSON.stringify(config) !== JSON.stringify(configRef.current);
-  if (configChanged) {
-    configRef.current = config;
-  }
-
+  // 初始化执行器 - 只在首次挂载时创建
   useEffect(() => {
     executorRef.current = createSurveyExecutor(configRef.current);
 
-    const removeListener = executorRef.current.addEventListener((event) => {
+    listenerCleanupRef.current = executorRef.current.addEventListener((event) => {
       // 更新状态
       switch (event.type) {
         case "start":
@@ -106,22 +102,26 @@ export function useSurveyExecutor(
           break;
       }
 
-      // 调用外部回调 (使用 ref 避免依赖变化)
+      // 调用外部回调
       onEventRef.current?.(event);
     });
 
     return () => {
-      removeListener();
-      executorRef.current?.cancel();
+      listenerCleanupRef.current?.();
+      // 注意：不在清理时取消执行，让执行自然完成
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [configChanged]);
+  }, []); // 空依赖 - 只在挂载时运行一次
 
   // 执行调研
   const execute = useCallback(
     async (personas: Persona[], questions: SurveyQuestion[]) => {
       if (!executorRef.current) {
         throw new Error("Executor not initialized");
+      }
+
+      // 如果执行器正在运行，先重置
+      if (executorRef.current.getStatus() === "running") {
+        executorRef.current.reset();
       }
 
       setProgress({
