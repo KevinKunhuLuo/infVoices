@@ -1,7 +1,7 @@
 /**
- * Basic Auth Middleware for Password Protection
+ * Auth Middleware for Password Protection
  *
- * 为应用添加简单的密码保护
+ * 为应用添加登录页面保护
  */
 
 import { NextResponse } from "next/server";
@@ -12,53 +12,27 @@ const AUTH_PASSWORD = process.env.AUTH_PASSWORD || "zxg111111";
 const AUTH_USER = process.env.AUTH_USER || "admin";
 
 // 不需要认证的路径
-const PUBLIC_PATHS = ["/api/"];
+const PUBLIC_PATHS = ["/api/", "/login"];
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // API 路由不需要密码保护
+  // API 路由和登录页面不需要保护
   if (PUBLIC_PATHS.some((path) => pathname.startsWith(path))) {
     return NextResponse.next();
   }
 
   // 检查是否已认证（通过 cookie）
   const authCookie = request.cookies.get("auth_token");
-  if (authCookie?.value === Buffer.from(`${AUTH_USER}:${AUTH_PASSWORD}`).toString("base64")) {
+  const expectedToken = Buffer.from(`${AUTH_USER}:${AUTH_PASSWORD}`).toString("base64");
+
+  if (authCookie?.value === expectedToken) {
     return NextResponse.next();
   }
 
-  // 检查 Basic Auth header
-  const authHeader = request.headers.get("authorization");
-
-  if (authHeader) {
-    const [scheme, encoded] = authHeader.split(" ");
-
-    if (scheme === "Basic" && encoded) {
-      const decoded = Buffer.from(encoded, "base64").toString();
-      const [user, password] = decoded.split(":");
-
-      if (user === AUTH_USER && password === AUTH_PASSWORD) {
-        // 认证成功，设置 cookie 避免重复认证
-        const response = NextResponse.next();
-        response.cookies.set("auth_token", encoded, {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === "production",
-          sameSite: "lax",
-          maxAge: 60 * 60 * 24 * 7, // 7 天
-        });
-        return response;
-      }
-    }
-  }
-
-  // 返回 401 要求认证
-  return new NextResponse("Authentication required", {
-    status: 401,
-    headers: {
-      "WWW-Authenticate": 'Basic realm="InfVoices - 请输入访问密码"',
-    },
-  });
+  // 未认证，重定向到登录页面
+  const loginUrl = new URL("/login", request.url);
+  return NextResponse.redirect(loginUrl);
 }
 
 export const config = {
