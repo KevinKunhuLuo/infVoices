@@ -12,8 +12,8 @@ import type {
   OpenRouterConfig,
 } from "./types";
 
-// 默认模型 - 使用 Gemini 3 Flash Preview
-const DEFAULT_MODEL = "google/gemini-3-flash-preview";
+// 默认模型 - 使用 Gemini Flash 1.5 (便宜且快速)
+const DEFAULT_MODEL = "google/gemini-flash-1.5";
 
 // API 端点
 const API_ENDPOINT = "https://openrouter.ai/api/v1/chat/completions";
