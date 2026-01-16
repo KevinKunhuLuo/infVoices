@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
 
 // 密码配置 - 从环境变量读取，fallback 到默认值
 const AUTH_PASSWORD = process.env.AUTH_PASSWORD || "zxg111111";
@@ -13,9 +12,9 @@ export async function POST(request: Request) {
       // 生成 token
       const token = Buffer.from(`${AUTH_USER}:${AUTH_PASSWORD}`).toString("base64");
 
-      // 设置 cookie
-      const cookieStore = await cookies();
-      cookieStore.set("auth_token", token, {
+      // 创建响应并设置 cookie
+      const response = NextResponse.json({ success: true });
+      response.cookies.set("auth_token", token, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: "lax",
@@ -23,7 +22,7 @@ export async function POST(request: Request) {
         path: "/",
       });
 
-      return NextResponse.json({ success: true });
+      return response;
     }
 
     return NextResponse.json(
