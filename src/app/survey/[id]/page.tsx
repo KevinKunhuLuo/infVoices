@@ -111,6 +111,21 @@ export default function SurveyDetailPage() {
       }
     }
 
+    // 加载已保存的调研结果
+    const savedResults = localStorage.getItem(`survey_results_${surveyId}`);
+    if (savedResults) {
+      try {
+        const { responses: savedResponses, report: savedReport } = JSON.parse(savedResults);
+        if (savedResponses && savedResponses.length > 0) {
+          setResponses(savedResponses);
+          setReport(savedReport);
+          setActiveTab("results");
+        }
+      } catch (e) {
+        console.error("Failed to load survey results:", e);
+      }
+    }
+
     setLoading(false);
   }, [surveyId]);
 
@@ -178,13 +193,40 @@ export default function SurveyDetailPage() {
 
     setReport(analysisReport);
     setActiveTab("results");
+
+    // 保存结果到 localStorage
+    try {
+      localStorage.setItem(
+        `survey_results_${survey.id}`,
+        JSON.stringify({
+          responses: completedResponses,
+          report: analysisReport,
+          savedAt: new Date().toISOString(),
+        })
+      );
+    } catch (e) {
+      console.error("Failed to save survey results:", e);
+    }
   };
 
-  // 重置
+  // 重置（重新运行）
   const handleReset = () => {
     setResponses([]);
     setReport(null);
     setActiveTab("run");
+  };
+
+  // 清除保存的结果
+  const handleClearResults = () => {
+    if (!survey) return;
+    setResponses([]);
+    setReport(null);
+    setActiveTab("config");
+    try {
+      localStorage.removeItem(`survey_results_${survey.id}`);
+    } catch (e) {
+      console.error("Failed to clear survey results:", e);
+    }
   };
 
   if (loading) {
@@ -642,6 +684,29 @@ export default function SurveyDetailPage() {
             <TabsContent value="results">
               {report ? (
                 <>
+                  <div className="flex items-center justify-between mb-4">
+                    <p className="text-sm text-muted-foreground">
+                      共 {responses.filter(r => r.status === "completed").length} 份有效回答
+                    </p>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleReset}
+                      >
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                        重新运行
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleClearResults}
+                        className="text-muted-foreground"
+                      >
+                        清除结果
+                      </Button>
+                    </div>
+                  </div>
                   <AnalysisDashboard
                     report={report}
                     responses={responses}
