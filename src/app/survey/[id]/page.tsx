@@ -75,12 +75,15 @@ export default function SurveyDetailPage() {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [selectedPreset, setSelectedPreset] = useState<string>("");
 
+  // LLM 配置状态
+  const [llmModel, setLlmModel] = useState<string>("");
+
   // 计算当前活跃的筛选数量
   const activeFilterCount = useMemo(() => {
     return Object.values(audienceFilters).filter((v) => v && v.length > 0).length;
   }, [audienceFilters]);
 
-  // 加载问卷数据
+  // 加载问卷数据和 LLM 设置
   useEffect(() => {
     const savedSurveys = localStorage.getItem("surveys");
     if (savedSurveys) {
@@ -94,6 +97,20 @@ export default function SurveyDetailPage() {
         console.error("Failed to load survey:", e);
       }
     }
+
+    // 加载 LLM 设置
+    const llmSettings = localStorage.getItem("llm_settings");
+    if (llmSettings) {
+      try {
+        const settings = JSON.parse(llmSettings);
+        if (settings.openrouterModel) {
+          setLlmModel(settings.openrouterModel);
+        }
+      } catch (e) {
+        console.error("Failed to load LLM settings:", e);
+      }
+    }
+
     setLoading(false);
   }, [surveyId]);
 
@@ -583,6 +600,10 @@ export default function SurveyDetailPage() {
                       </CardHeader>
                       <CardContent className="space-y-3 text-sm">
                         <div className="flex justify-between">
+                          <span className="text-muted-foreground">模型</span>
+                          <span className="font-medium text-xs">{llmModel || "默认模型"}</span>
+                        </div>
+                        <div className="flex justify-between">
                           <span className="text-muted-foreground">并发数</span>
                           <span className="font-medium">5</span>
                         </div>
@@ -615,6 +636,7 @@ export default function SurveyDetailPage() {
                     <SurveyRunner
                       personas={personas}
                       questions={survey.questions}
+                      config={llmModel ? { model: llmModel } : undefined}
                       onComplete={handleComplete}
                     />
                   </div>
