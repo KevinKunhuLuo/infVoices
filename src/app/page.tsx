@@ -12,6 +12,7 @@ import {
   CheckCircle2,
   PlayCircle,
   Sparkles,
+  Zap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -180,6 +181,47 @@ export default function HomePage() {
         animate="visible"
         variants={staggerContainer}
       >
+        {/* 快速调研卡片 */}
+        <motion.div variants={staggerItem}>
+          <Link href="/quick-survey">
+            <motion.div
+              className={cn(
+                "group relative h-full min-h-[200px]",
+                "rounded-2xl border-2 border-dashed border-amber-300 dark:border-amber-500/50",
+                "hover:border-amber-500 transition-colors",
+                "flex flex-col items-center justify-center gap-4",
+                "cursor-pointer bg-amber-50/50 dark:bg-amber-500/5"
+              )}
+              variants={cardHover}
+              initial="rest"
+              whileHover="hover"
+              whileTap="tap"
+            >
+              <div
+                className={cn(
+                  "p-4 rounded-2xl",
+                  "bg-amber-100 group-hover:bg-amber-500 dark:bg-amber-500/20 dark:group-hover:bg-amber-500",
+                  "transition-all duration-300"
+                )}
+              >
+                <Zap
+                  className={cn(
+                    "h-8 w-8",
+                    "text-amber-600 group-hover:text-white dark:text-amber-400 dark:group-hover:text-white",
+                    "transition-colors duration-300"
+                  )}
+                />
+              </div>
+              <div className="text-center">
+                <p className="font-medium">快速调研</p>
+                <p className="text-sm text-muted-foreground">
+                  一道题，快速获得反馈
+                </p>
+              </div>
+            </motion.div>
+          </Link>
+        </motion.div>
+
         {/* 新建项目卡片 */}
         <motion.div variants={staggerItem}>
           <Link href="/survey/new">
@@ -315,12 +357,20 @@ export default function HomePage() {
           <p className="text-muted-foreground mb-6">
             创建你的第一个虚拟人口调研，快速获得市场洞察
           </p>
-          <Button asChild className="btn-gradient text-white">
-            <Link href="/survey/new">
-              <Plus className="h-4 w-4 mr-2" />
-              新建调研项目
-            </Link>
-          </Button>
+          <div className="flex items-center justify-center gap-3">
+            <Button asChild variant="outline">
+              <Link href="/quick-survey">
+                <Zap className="h-4 w-4 mr-2" />
+                快速调研
+              </Link>
+            </Button>
+            <Button asChild className="btn-gradient text-white">
+              <Link href="/survey/new">
+                <Plus className="h-4 w-4 mr-2" />
+                新建调研项目
+              </Link>
+            </Button>
+          </div>
         </motion.div>
       )}
     </div>

@@ -396,6 +396,21 @@ function ImageCompareEditor({
   images: ImageConfig[];
   onChange: (images: ImageConfig[]) => void;
 }) {
+  const handleFileSelect = (index: number, file: File) => {
+    if (!file.type.startsWith("image/")) {
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const base64 = e.target?.result as string;
+      const newImages = [...images];
+      newImages[index] = { ...newImages[index], url: base64, alt: file.name };
+      onChange(newImages);
+    };
+    reader.readAsDataURL(file);
+  };
+
   const addImage = () => {
     onChange([...images, { url: "", alt: "", caption: "" }]);
   };
@@ -417,30 +432,43 @@ function ImageCompareEditor({
       <div className="grid grid-cols-2 gap-4">
         {images.map((image, index) => (
           <div key={index} className="relative group">
-            <div className="aspect-video border-2 border-dashed rounded-lg flex flex-col items-center justify-center bg-muted/50 overflow-hidden">
-              {image.url ? (
-                <img
-                  src={image.url}
-                  alt={image.alt || `图片 ${index + 1}`}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <>
-                  <Upload className="h-8 w-8 text-muted-foreground mb-2" />
-                  <span className="text-xs text-muted-foreground">
-                    点击上传图片
-                  </span>
-                </>
-              )}
-            </div>
-            <Button
-              variant="destructive"
-              size="icon"
-              className="absolute top-2 right-2 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-              onClick={() => deleteImage(index)}
-            >
-              <X className="h-3 w-3" />
-            </Button>
+            <label className="cursor-pointer block">
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleFileSelect(index, file);
+                }}
+              />
+              <div className="aspect-video border-2 border-dashed rounded-lg flex flex-col items-center justify-center bg-muted/50 overflow-hidden hover:bg-muted/70 transition-colors">
+                {image.url ? (
+                  <img
+                    src={image.url}
+                    alt={image.alt || `图片 ${index + 1}`}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <>
+                    <Upload className="h-8 w-8 text-muted-foreground mb-2" />
+                    <span className="text-xs text-muted-foreground">
+                      点击上传图片
+                    </span>
+                  </>
+                )}
+              </div>
+            </label>
+            {image.url && (
+              <Button
+                variant="destructive"
+                size="icon"
+                className="absolute top-2 right-2 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                onClick={() => deleteImage(index)}
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            )}
             <Input
               placeholder="图片说明..."
               value={image.caption || ""}
@@ -451,18 +479,41 @@ function ImageCompareEditor({
         ))}
 
         {images.length < 4 && (
-          <div
-            className="aspect-video border-2 border-dashed rounded-lg flex flex-col items-center justify-center bg-muted/30 cursor-pointer hover:bg-muted/50 transition-colors"
-            onClick={addImage}
-          >
-            <Plus className="h-8 w-8 text-muted-foreground mb-2" />
-            <span className="text-xs text-muted-foreground">添加图片</span>
-          </div>
+          <label className="cursor-pointer block">
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                  const newIndex = images.length;
+                  onChange([...images, { url: "", alt: "", caption: "" }]);
+                  // 延迟处理以确保数组更新
+                  setTimeout(() => {
+                    const reader = new FileReader();
+                    reader.onload = (ev) => {
+                      const base64 = ev.target?.result as string;
+                      onChange([
+                        ...images,
+                        { url: base64, alt: file.name, caption: "" },
+                      ]);
+                    };
+                    reader.readAsDataURL(file);
+                  }, 0);
+                }
+              }}
+            />
+            <div className="aspect-video border-2 border-dashed rounded-lg flex flex-col items-center justify-center bg-muted/30 hover:bg-muted/50 transition-colors">
+              <Plus className="h-8 w-8 text-muted-foreground mb-2" />
+              <span className="text-xs text-muted-foreground">添加图片</span>
+            </div>
+          </label>
         )}
       </div>
 
       <p className="text-xs text-muted-foreground">
-        支持上传2-4张图片进行对比，支持JPG、PNG格式
+        支持上传2-4张图片进行对比，支持JPG、PNG格式（最大5MB）
       </p>
     </div>
   );
@@ -488,6 +539,25 @@ function ConceptTestEditor({
 
   const updateConfig = (updates: Partial<typeof conceptConfig>) => {
     onChange({ ...conceptConfig, ...updates });
+  };
+
+  const handleImageUpload = (file: File) => {
+    if (!file.type.startsWith("image/")) {
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const base64 = e.target?.result as string;
+      updateConfig({
+        conceptImage: { url: base64, alt: file.name },
+      });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const removeImage = () => {
+    updateConfig({ conceptImage: undefined });
   };
 
   const addDimension = () => {
@@ -519,22 +589,48 @@ function ConceptTestEditor({
       {/* 概念图片 */}
       <div className="space-y-2">
         <Label>概念图片/产品图</Label>
-        <div className="aspect-video border-2 border-dashed rounded-lg flex flex-col items-center justify-center bg-muted/50 overflow-hidden">
-          {conceptConfig.conceptImage?.url ? (
-            <img
-              src={conceptConfig.conceptImage.url}
-              alt="概念图"
-              className="w-full h-full object-cover"
+        <div className="relative group">
+          <label className="cursor-pointer block">
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) handleImageUpload(file);
+              }}
             />
-          ) : (
-            <>
-              <Upload className="h-8 w-8 text-muted-foreground mb-2" />
-              <span className="text-xs text-muted-foreground">
-                点击上传概念图
-              </span>
-            </>
+            <div className="aspect-video border-2 border-dashed rounded-lg flex flex-col items-center justify-center bg-muted/50 overflow-hidden hover:bg-muted/70 transition-colors">
+              {conceptConfig.conceptImage?.url ? (
+                <img
+                  src={conceptConfig.conceptImage.url}
+                  alt="概念图"
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <>
+                  <Upload className="h-8 w-8 text-muted-foreground mb-2" />
+                  <span className="text-xs text-muted-foreground">
+                    点击上传概念图
+                  </span>
+                </>
+              )}
+            </div>
+          </label>
+          {conceptConfig.conceptImage?.url && (
+            <Button
+              variant="destructive"
+              size="icon"
+              className="absolute top-2 right-2 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+              onClick={removeImage}
+            >
+              <X className="h-3 w-3" />
+            </Button>
           )}
         </div>
+        <p className="text-xs text-muted-foreground">
+          支持 JPG、PNG 格式（最大 5MB）
+        </p>
       </div>
 
       {/* 概念描述 */}

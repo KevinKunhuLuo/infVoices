@@ -12,6 +12,9 @@ import {
   PieChart as PieChartIcon,
   Filter,
   Download,
+  Eye,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -31,7 +34,10 @@ import {
   RadarChartComponent,
   StatCard,
   StatCardGrid,
+  WordCloud,
 } from "@/components/charts";
+import { PersonaResponseDialog } from "./persona-response-dialog";
+import { CrossAnalysisPanel } from "./cross-analysis-panel";
 import { staggerContainer, staggerItem } from "@/lib/motion";
 import type {
   AnalysisReport,
@@ -40,13 +46,17 @@ import type {
   DemographicDimension,
 } from "@/lib/analysis";
 import { DEMOGRAPHIC_LABELS } from "@/lib/analysis";
+import type { ResponseEntry } from "@/lib/survey/executor";
+import type { SurveyQuestion } from "@/lib/survey";
 
 interface AnalysisDashboardProps {
   report: AnalysisReport;
+  responses?: ResponseEntry[];
+  questions?: SurveyQuestion[];
   onExport?: () => void;
 }
 
-export function AnalysisDashboard({ report, onExport }: AnalysisDashboardProps) {
+export function AnalysisDashboard({ report, responses = [], questions = [], onExport }: AnalysisDashboardProps) {
   const [selectedDemographic, setSelectedDemographic] =
     useState<DemographicDimension>("gender");
   const [chartType, setChartType] = useState<"pie" | "bar">("pie");
@@ -284,13 +294,18 @@ export function AnalysisDashboard({ report, onExport }: AnalysisDashboardProps) 
 
           {/* 问题分析 */}
           <TabsContent value="questions" className="space-y-4">
-            {report.questions.map((questionStats, index) => (
-              <QuestionAnalysisCard
-                key={questionStats.questionId}
-                stats={questionStats}
-                index={index}
-              />
-            ))}
+            {report.questions.map((questionStats, index) => {
+              const question = questions.find(q => q.id === questionStats.questionId);
+              return (
+                <QuestionAnalysisCard
+                  key={questionStats.questionId}
+                  stats={questionStats}
+                  question={question}
+                  index={index}
+                  responses={responses}
+                />
+              );
+            })}
           </TabsContent>
 
           {/* 洞察 */}
@@ -372,13 +387,28 @@ export function AnalysisDashboard({ report, onExport }: AnalysisDashboardProps) 
 // 问题分析卡片组件
 function QuestionAnalysisCard({
   stats,
+  question,
   index,
+  responses = [],
 }: {
   stats: AnswerStatistics;
+  question?: SurveyQuestion;
   index: number;
+  responses?: ResponseEntry[];
 }) {
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [selectedAnswer, setSelectedAnswer] = useState<string | undefined>();
+  const [selectedAnswerLabel, setSelectedAnswerLabel] = useState<string | undefined>();
+  const [showCrossAnalysis, setShowCrossAnalysis] = useState(false);
+
   const isScaleQuestion = stats.questionType === "scale";
   const scaleStats = isScaleQuestion ? (stats as ScaleStatistics) : null;
+
+  // 判断是否可以显示交叉分析（选择题类型）
+  const canShowCrossAnalysis =
+    question &&
+    (stats.questionType === "single_choice" || stats.questionType === "multiple_choice") &&
+    responses.length > 0;
 
   const chartData = stats.distribution.map((d) => ({
     name: d.label,
@@ -395,6 +425,14 @@ function QuestionAnalysisCard({
     concept_test: "概念测试",
   };
 
+  const handleViewResponses = (answerValue?: string, answerLabel?: string) => {
+    setSelectedAnswer(answerValue);
+    setSelectedAnswerLabel(answerLabel);
+    setDialogOpen(true);
+  };
+
+  const hasResponses = responses.length > 0;
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -410,9 +448,40 @@ function QuestionAnalysisCard({
               </Badge>
               <CardTitle className="text-base">{stats.questionTitle}</CardTitle>
             </div>
-            <div className="text-right text-sm text-muted-foreground">
-              <p>{stats.validResponses} 有效回答</p>
-              <p>置信度 {(stats.averageConfidence * 100).toFixed(0)}%</p>
+            <div className="flex items-start gap-4">
+              <div className="text-right text-sm text-muted-foreground">
+                <p>{stats.validResponses} 有效回答</p>
+                <p>置信度 {(stats.averageConfidence * 100).toFixed(0)}%</p>
+              </div>
+              <div className="flex items-center gap-2">
+                {canShowCrossAnalysis && (
+                  <Button
+                    variant={showCrossAnalysis ? "secondary" : "outline"}
+                    size="sm"
+                    className="gap-1.5"
+                    onClick={() => setShowCrossAnalysis(!showCrossAnalysis)}
+                  >
+                    <TrendingUp className="h-4 w-4" />
+                    交叉分析
+                    {showCrossAnalysis ? (
+                      <ChevronUp className="h-3 w-3" />
+                    ) : (
+                      <ChevronDown className="h-3 w-3" />
+                    )}
+                  </Button>
+                )}
+                {hasResponses && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5"
+                    onClick={() => handleViewResponses()}
+                  >
+                    <Eye className="h-4 w-4" />
+                    查看明细
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
         </CardHeader>
@@ -429,6 +498,15 @@ function QuestionAnalysisCard({
                 />
               ) : stats.questionType === "scale" ? (
                 <BarChartComponent data={chartData} showLabels />
+              ) : stats.questionType === "open_text" ? (
+                <WordCloud
+                  data={stats.distribution.map((d) => ({
+                    text: d.label,
+                    count: d.count,
+                  }))}
+                  maxWords={20}
+                  colorScheme="gradient"
+                />
               ) : (
                 <PieChartComponent data={chartData} size="md" showLabels={true} />
               )}
@@ -460,10 +538,18 @@ function QuestionAnalysisCard({
               )}
 
               <h4 className="text-sm font-medium text-muted-foreground">
-                答案分布
+                答案分布 {hasResponses && <span className="text-xs">(点击查看详情)</span>}
               </h4>
               {stats.distribution.slice(0, 6).map((item, i) => (
-                <div key={item.value} className="space-y-1">
+                <button
+                  key={item.value}
+                  className={cn(
+                    "w-full text-left space-y-1 p-2 -mx-2 rounded-lg transition-colors",
+                    hasResponses && "hover:bg-muted/50 cursor-pointer"
+                  )}
+                  onClick={() => hasResponses && handleViewResponses(item.value, item.label)}
+                  disabled={!hasResponses}
+                >
                   <div className="flex justify-between text-sm">
                     <span className="truncate max-w-[200px]">{item.label}</span>
                     <span className="font-medium">
@@ -479,12 +565,40 @@ function QuestionAnalysisCard({
                       style={{ backgroundColor: item.color }}
                     />
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           </div>
         </CardContent>
       </Card>
+
+      {/* 交叉分析面板 */}
+      <AnimatePresence>
+        {showCrossAnalysis && canShowCrossAnalysis && question && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.2 }}
+            className="mt-4"
+          >
+            <CrossAnalysisPanel question={question} responses={responses} />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 个体回答详情弹窗 */}
+      {hasResponses && (
+        <PersonaResponseDialog
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+          questionId={stats.questionId}
+          questionTitle={stats.questionTitle}
+          selectedAnswer={selectedAnswer}
+          selectedAnswerLabel={selectedAnswerLabel}
+          responses={responses}
+        />
+      )}
     </motion.div>
   );
 }

@@ -68,7 +68,7 @@ export default function SurveyDetailPage() {
   const [showExportDialog, setShowExportDialog] = useState(false);
 
   // 样本配置状态
-  const [sampleSize, setSampleSize] = useState<number>(100);
+  const [sampleSize, setSampleSize] = useState<number>(50);
   const [customSize, setCustomSize] = useState<string>("");
   const [isCustomSize, setIsCustomSize] = useState(false);
   const [audienceFilters, setAudienceFilters] = useState<DimensionConfig>({});
@@ -644,6 +644,8 @@ export default function SurveyDetailPage() {
                 <>
                   <AnalysisDashboard
                     report={report}
+                    responses={responses}
+                    questions={survey.questions}
                     onExport={() => setShowExportDialog(true)}
                   />
                   <ExportDialog

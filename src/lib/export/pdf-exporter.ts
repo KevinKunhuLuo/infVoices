@@ -307,15 +307,33 @@ export async function exportReportToPDF(
 ): Promise<void> {
   // 使用安全的 DOM 方法创建报告元素
   const container = createReportElement(report);
-  container.style.cssText += "position: absolute; left: -9999px; top: 0;";
+
+  // 使用固定定位确保元素可以被渲染
+  container.style.cssText += `
+    position: fixed;
+    left: 0;
+    top: 0;
+    z-index: -9999;
+    opacity: 0;
+    pointer-events: none;
+  `;
+
   document.body.appendChild(container);
+
+  // 等待一帧以确保 DOM 更新
+  await new Promise((resolve) => requestAnimationFrame(resolve));
 
   try {
     await exportToPDF(container, {
       filename: `${report.surveyTitle}-分析报告`,
       ...options,
     });
+  } catch (error) {
+    console.error("PDF export failed:", error);
+    throw new Error("PDF 导出失败，请检查浏览器是否支持");
   } finally {
-    document.body.removeChild(container);
+    if (container.parentNode) {
+      document.body.removeChild(container);
+    }
   }
 }

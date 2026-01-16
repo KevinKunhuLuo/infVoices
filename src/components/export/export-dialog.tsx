@@ -12,6 +12,8 @@ import {
   Lock,
   X,
   FileText,
+  AlertCircle,
+  CheckCircle2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -52,6 +54,8 @@ export function ExportDialog({ open, onOpenChange, report }: ExportDialogProps) 
   const [isExporting, setIsExporting] = useState(false);
   const [shareLink, setShareLink] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [exportStatus, setExportStatus] = useState<"idle" | "success" | "error">("idle");
+  const [exportError, setExportError] = useState<string | null>(null);
 
   // PDF 导出选项
   const [pdfOptions, setPdfOptions] = useState<ExportOptions>({
@@ -71,10 +75,16 @@ export function ExportDialog({ open, onOpenChange, report }: ExportDialogProps) 
   // 导出 PDF
   const handleExportPDF = async () => {
     setIsExporting(true);
+    setExportStatus("idle");
+    setExportError(null);
     try {
       await exportReportToPDF(report, pdfOptions);
+      setExportStatus("success");
+      setTimeout(() => setExportStatus("idle"), 3000);
     } catch (error) {
       console.error("Export failed:", error);
+      setExportStatus("error");
+      setExportError(error instanceof Error ? error.message : "导出失败，请重试");
     } finally {
       setIsExporting(false);
     }
@@ -194,11 +204,28 @@ export function ExportDialog({ open, onOpenChange, report }: ExportDialogProps) 
             >
               {isExporting ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
+              ) : exportStatus === "success" ? (
+                <CheckCircle2 className="h-4 w-4 text-emerald-500" />
               ) : (
                 <Download className="h-4 w-4" />
               )}
-              {isExporting ? "正在导出..." : "导出 PDF"}
+              {isExporting ? "正在导出..." : exportStatus === "success" ? "导出成功！" : "导出 PDF"}
             </Button>
+
+            {/* 错误提示 */}
+            <AnimatePresence>
+              {exportStatus === "error" && exportError && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="flex items-center gap-2 p-3 bg-destructive/10 text-destructive rounded-lg text-sm"
+                >
+                  <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                  <span>{exportError}</span>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </TabsContent>
 
           <TabsContent value="share" className="space-y-4 mt-4">
