@@ -180,6 +180,7 @@ export function getLLMManager(config?: Partial<LLMManagerConfig>): LLMManager {
       fallbackProvider: "volcengine",
       volcengineApiKey: process.env.VOLCENGINE_API_KEY,
       openrouterApiKey: process.env.OPENROUTER_API_KEY,
+      openrouterModel: process.env.OPENROUTER_MODEL,
       ...config,
     });
   }

@@ -4,90 +4,105 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   Settings,
-  Key,
   Server,
   CheckCircle,
+  XCircle,
   Loader2,
-  Eye,
-  EyeOff,
-  Save,
   RefreshCw,
+  Save,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { fadeInUp, staggerContainer, staggerItem } from "@/lib/motion";
 
-interface ProviderStatus {
+interface ServerConfig {
   configured: boolean;
-  available: boolean;
-  checking: boolean;
+  defaultModel?: string;
 }
 
 export default function SettingsPage() {
-  // API 密钥状态
-  const [openrouterKey, setOpenrouterKey] = useState("");
-  const [openrouterModel, setOpenrouterModel] = useState("google/gemini-3-flash-preview");
+  const [serverConfig, setServerConfig] = useState<ServerConfig | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [testing, setTesting] = useState(false);
 
-  // 显示/隐藏密钥
-  const [showOpenrouterKey, setShowOpenrouterKey] = useState(false);
+  // 用户本地设置
+  const [userModel, setUserModel] = useState("");
+  const [useCustomModel, setUseCustomModel] = useState(false);
 
-  // 提供商状态
-  const [openrouterStatus, setOpenrouterStatus] = useState<ProviderStatus>({
-    configured: false,
-    available: false,
-    checking: false,
-  });
-
-  // 加载保存的设置
+  // 加载服务端配置和本地设置
   useEffect(() => {
-    const saved = localStorage.getItem("llm_settings");
+    // 加载服务端配置
+    fetch("/api/llm/config")
+      .then((res) => res.json())
+      .then((data) => {
+        setServerConfig(data);
+      })
+      .catch((e) => {
+        console.error("Failed to load config:", e);
+        setServerConfig({ configured: false });
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+
+    // 加载本地设置
+    const saved = localStorage.getItem("llm_user_settings");
     if (saved) {
       try {
         const settings = JSON.parse(saved);
-        setOpenrouterKey(settings.openrouterKey || "");
-        setOpenrouterModel(settings.openrouterModel || "google/gemini-3-flash-preview");
-        setOpenrouterStatus((s) => ({ ...s, configured: !!settings.openrouterKey }));
+        if (settings.model) {
+          setUserModel(settings.model);
+          setUseCustomModel(true);
+        }
       } catch (e) {
-        console.error("Failed to load settings:", e);
+        console.error("Failed to load local settings:", e);
       }
     }
   }, []);
 
-  // 保存设置
+  // 保存本地设置
   const handleSave = () => {
-    const settings = {
-      openrouterKey,
-      openrouterModel,
-    };
-    localStorage.setItem("llm_settings", JSON.stringify(settings));
-    setOpenrouterStatus((s) => ({ ...s, configured: !!openrouterKey }));
-    toast.success("设置已保存");
+    if (useCustomModel && userModel.trim()) {
+      localStorage.setItem("llm_user_settings", JSON.stringify({ model: userModel.trim() }));
+      toast.success("已保存自定义模型设置");
+    } else {
+      localStorage.removeItem("llm_user_settings");
+      setUserModel("");
+      setUseCustomModel(false);
+      toast.success("已恢复使用默认模型");
+    }
   };
 
   // 测试连接
   const testConnection = async () => {
-    if (!openrouterKey) {
-      toast.error("请先输入 API 密钥");
-      return;
-    }
-
-    setOpenrouterStatus((s) => ({ ...s, checking: true }));
-
+    setTesting(true);
     try {
-      // 模拟测试
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-      setOpenrouterStatus((s) => ({ ...s, checking: false, available: true }));
-      toast.success("OpenRouter 连接成功");
+      const testModel = useCustomModel && userModel.trim() ? userModel.trim() : undefined;
+      const response = await fetch("/api/llm/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ model: testModel }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        toast.success(`连接成功！使用模型: ${data.model}`);
+      } else {
+        toast.error(data.error || "连接测试失败");
+      }
     } catch {
-      setOpenrouterStatus((s) => ({ ...s, checking: false, available: false }));
       toast.error("连接测试失败");
+    } finally {
+      setTesting(false);
     }
   };
+
+  const currentModel = useCustomModel && userModel.trim()
+    ? userModel.trim()
+    : serverConfig?.defaultModel || "google/gemini-3-flash-preview";
 
   return (
     <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 py-8">
@@ -103,7 +118,7 @@ export default function SettingsPage() {
           设置
         </h1>
         <p className="mt-2 text-muted-foreground">
-          配置 LLM API 密钥和模型参数
+          配置 LLM 模型参数
         </p>
       </motion.div>
 
@@ -113,7 +128,7 @@ export default function SettingsPage() {
         animate="visible"
         variants={staggerContainer}
       >
-        {/* OpenRouter 配置 */}
+        {/* 服务状态 */}
         <motion.div variants={staggerItem}>
           <Card>
             <CardHeader>
@@ -123,140 +138,112 @@ export default function SettingsPage() {
                     <Server className="h-5 w-5 text-purple-500" />
                   </div>
                   <div>
-                    <CardTitle className="text-lg">OpenRouter</CardTitle>
-                    <CardDescription>LLM 提供商（支持多种模型）</CardDescription>
+                    <CardTitle className="text-lg">OpenRouter 服务</CardTitle>
+                    <CardDescription>LLM API 服务状态</CardDescription>
                   </div>
                 </div>
-                <ProviderStatusBadge status={openrouterStatus} />
+                {loading ? (
+                  <Badge variant="secondary" className="gap-1">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    加载中
+                  </Badge>
+                ) : serverConfig?.configured ? (
+                  <Badge variant="default" className="gap-1 bg-emerald-500">
+                    <CheckCircle className="h-3 w-3" />
+                    已配置
+                  </Badge>
+                ) : (
+                  <Badge variant="destructive" className="gap-1">
+                    <XCircle className="h-3 w-3" />
+                    未配置
+                  </Badge>
+                )}
               </div>
+            </CardHeader>
+            <CardContent>
+              {!loading && serverConfig?.configured && (
+                <div className="flex justify-between items-center py-2">
+                  <span className="text-muted-foreground">服务端默认模型</span>
+                  <code className="text-sm bg-muted px-2 py-1 rounded">
+                    {serverConfig.defaultModel}
+                  </code>
+                </div>
+              )}
+              {!loading && !serverConfig?.configured && (
+                <p className="text-sm text-muted-foreground">
+                  服务端未配置 API 密钥，请联系管理员
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        {/* 用户模型设置 */}
+        <motion.div variants={staggerItem}>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">模型设置</CardTitle>
+              <CardDescription>
+                自定义你的 LLM 模型，留空则使用服务端默认值
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="openrouter-key">API 密钥</Label>
-                <div className="flex gap-2">
-                  <div className="relative flex-1">
-                    <Input
-                      id="openrouter-key"
-                      type={showOpenrouterKey ? "text" : "password"}
-                      placeholder="输入 OpenRouter API 密钥..."
-                      value={openrouterKey}
-                      onChange={(e) => setOpenrouterKey(e.target.value)}
-                    />
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
-                      onClick={() => setShowOpenrouterKey(!showOpenrouterKey)}
-                    >
-                      {showOpenrouterKey ? (
-                        <EyeOff className="h-4 w-4" />
-                      ) : (
-                        <Eye className="h-4 w-4" />
-                      )}
-                    </Button>
-                  </div>
-                  <Button
-                    variant="outline"
-                    onClick={testConnection}
-                    disabled={openrouterStatus.checking}
-                  >
-                    {openrouterStatus.checking ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <RefreshCw className="h-4 w-4" />
-                    )}
-                  </Button>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="openrouter-model">默认模型</Label>
+                <Label htmlFor="model">自定义模型（可选）</Label>
                 <Input
-                  id="openrouter-model"
-                  placeholder="输入模型名称，如 google/gemini-3-flash-preview"
-                  value={openrouterModel}
-                  onChange={(e) => setOpenrouterModel(e.target.value)}
+                  id="model"
+                  placeholder={serverConfig?.defaultModel || "google/gemini-3-flash-preview"}
+                  value={userModel}
+                  onChange={(e) => {
+                    setUserModel(e.target.value);
+                    setUseCustomModel(!!e.target.value.trim());
+                  }}
                 />
                 <p className="text-xs text-muted-foreground">
                   常用模型：google/gemini-3-flash-preview, anthropic/claude-3.5-sonnet, openai/gpt-4o
                 </p>
               </div>
 
-              <p className="text-xs text-muted-foreground">
-                获取 API 密钥：
-                <a
-                  href="https://openrouter.ai/keys"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-primary hover:underline ml-1"
+              <div className="flex justify-between items-center py-2 bg-muted/50 rounded-lg px-3">
+                <span className="text-sm text-muted-foreground">当前使用模型</span>
+                <code className="text-sm font-medium">
+                  {currentModel}
+                </code>
+              </div>
+
+              <div className="flex gap-2">
+                <Button onClick={handleSave} className="flex-1 gap-2">
+                  <Save className="h-4 w-4" />
+                  保存设置
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={testConnection}
+                  disabled={testing || !serverConfig?.configured}
                 >
-                  OpenRouter 控制台
-                </a>
-              </p>
+                  {testing ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </motion.div>
 
-        <Separator />
-
-        {/* 保存按钮 */}
+        {/* 说明 */}
         <motion.div variants={staggerItem}>
-          <Button onClick={handleSave} className="w-full gap-2">
-            <Save className="h-4 w-4" />
-            保存设置
-          </Button>
-        </motion.div>
-
-        {/* 提示信息 */}
-        <motion.div variants={staggerItem}>
-          <div className="text-xs text-muted-foreground bg-muted/50 rounded-lg p-4 space-y-2">
-            <p className="font-medium">安全提示</p>
+          <div className="text-sm text-muted-foreground bg-muted/50 rounded-lg p-4 space-y-2">
+            <p className="font-medium">说明</p>
             <ul className="list-disc list-inside space-y-1 text-muted-foreground/80">
-              <li>API 密钥仅存储在本地浏览器中</li>
-              <li>建议使用独立的 API 密钥用于此应用</li>
-              <li>定期轮换 API 密钥以确保安全</li>
-              <li>生产环境建议使用服务端密钥管理</li>
+              <li>自定义模型设置仅对当前浏览器有效</li>
+              <li>清空输入框并保存可恢复使用默认模型</li>
+              <li>可在 <a href="https://openrouter.ai/models" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">OpenRouter Models</a> 查看可用模型列表</li>
             </ul>
           </div>
         </motion.div>
       </motion.div>
     </div>
-  );
-}
-
-// 提供商状态徽章
-function ProviderStatusBadge({ status }: { status: ProviderStatus }) {
-  if (status.checking) {
-    return (
-      <Badge variant="secondary" className="gap-1">
-        <Loader2 className="h-3 w-3 animate-spin" />
-        检测中
-      </Badge>
-    );
-  }
-
-  if (!status.configured) {
-    return (
-      <Badge variant="outline" className="gap-1 text-muted-foreground">
-        <Key className="h-3 w-3" />
-        未配置
-      </Badge>
-    );
-  }
-
-  if (status.available) {
-    return (
-      <Badge variant="default" className="gap-1 bg-emerald-500">
-        <CheckCircle className="h-3 w-3" />
-        已连接
-      </Badge>
-    );
-  }
-
-  return (
-    <Badge variant="secondary" className="gap-1">
-      <Key className="h-3 w-3" />
-      已配置
-    </Badge>
   );
 }
