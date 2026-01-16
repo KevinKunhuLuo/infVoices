@@ -169,6 +169,8 @@ export class SurveyExecutor {
     personas: Persona[],
     questions: SurveyQuestion[]
   ): Promise<ResponseEntry[]> {
+    console.log("Executor.execute called", { personas: personas.length, questions: questions.length, status: this.status });
+
     if (this.status === "running") {
       throw new Error("Executor is already running");
     }
@@ -303,6 +305,7 @@ export class SurveyExecutor {
    * 调用 API 执行调研
    */
   private async callAPI(persona: Persona): Promise<SurveyResponse> {
+    console.log("callAPI called for persona:", persona.name);
     const controller = new AbortController();
 
     // 超时处理

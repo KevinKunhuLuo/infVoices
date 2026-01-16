@@ -77,8 +77,10 @@ export function SurveyRunner({
   });
 
   const handleStart = async () => {
+    console.log("handleStart called", { personas: personas.length, questions: questions.length });
     try {
-      await execute(personas, questions);
+      const results = await execute(personas, questions);
+      console.log("Execution completed", results);
     } catch (err) {
       console.error("Survey execution error:", err);
     }
