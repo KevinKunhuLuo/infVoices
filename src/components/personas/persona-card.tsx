@@ -7,6 +7,7 @@ import {
   GraduationCap,
   Users,
   Wallet,
+  Percent,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
@@ -165,20 +166,28 @@ export function PersonaCard({
             </p>
           )}
 
-          {/* 特点标签 */}
-          {persona.traits && persona.traits.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
-              {persona.traits.map((trait, index) => (
-                <Badge
-                  key={index}
-                  variant="secondary"
-                  className="text-xs"
-                >
-                  {trait}
-                </Badge>
-              ))}
-            </div>
-          )}
+          {/* 特点标签和人群占比 */}
+          <div className="flex flex-wrap gap-1.5 items-center">
+            {persona.traits?.map((trait, index) => (
+              <Badge
+                key={index}
+                variant="secondary"
+                className="text-xs"
+              >
+                {trait}
+              </Badge>
+            ))}
+            {persona.populationShare && (
+              <Badge
+                variant="outline"
+                className="text-xs gap-1"
+                title="该人群在总人口中的估算占比"
+              >
+                <Percent className="h-3 w-3" />
+                {persona.populationShare}
+              </Badge>
+            )}
+          </div>
         </CardContent>
       </Card>
     </motion.div>

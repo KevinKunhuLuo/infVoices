@@ -29,4 +29,8 @@ export {
   generatePersona,
   generatePersonas,
   calculateSampleSize,
+  getDataSourceNotes,
 } from "./generator";
+
+// 条件概率导出
+export { dataSourceNotes } from "./conditional-probabilities";

@@ -8,6 +8,9 @@ import {
   Users,
   SlidersHorizontal,
   Hash,
+  Info,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -35,6 +38,7 @@ import {
   generatePersonas,
   allDimensions,
   audiencePresets,
+  getDataSourceNotes,
 } from "@/lib/personas";
 import { staggerContainer, staggerItem, fadeInUp } from "@/lib/motion";
 import type { Persona, DimensionConfig } from "@/lib/supabase";
@@ -42,6 +46,14 @@ import type { Persona, DimensionConfig } from "@/lib/supabase";
 // 可配置的角色数量选项
 const PERSONA_COUNT_OPTIONS = [12, 24, 48, 96];
 const DEFAULT_PERSONA_COUNT = 24;
+
+// 数据来源说明
+const dataSourceNotes = getDataSourceNotes();
+const confidenceLabels: Record<string, { label: string; color: string }> = {
+  high: { label: "✓ 高可信度", color: "text-green-600" },
+  medium: { label: "~ 中等可信度", color: "text-yellow-600" },
+  low: { label: "○ 低可信度", color: "text-orange-600" },
+};
 
 export default function PersonasPage() {
   // 状态
@@ -56,6 +68,7 @@ export default function PersonasPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedPreset, setSelectedPreset] = useState<string>("default");
   const [filters, setFilters] = useState<DimensionConfig>({});
+  const [showDataSources, setShowDataSources] = useState(false);
 
   // 筛选后的角色列表
   const filteredPersonas = useMemo(() => {
@@ -396,6 +409,61 @@ export default function PersonasPage() {
         open={isDetailOpen}
         onOpenChange={setIsDetailOpen}
       />
+
+      {/* 数据来源说明 */}
+      <motion.div
+        className="mt-12 border-t pt-6"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.5 }}
+      >
+        <button
+          onClick={() => setShowDataSources(!showDataSources)}
+          className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <Info className="h-4 w-4" />
+          <span>数据来源与可信度说明</span>
+          {showDataSources ? (
+            <ChevronUp className="h-4 w-4" />
+          ) : (
+            <ChevronDown className="h-4 w-4" />
+          )}
+        </button>
+
+        {showDataSources && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
+          >
+            {Object.entries(dataSourceNotes).map(([key, info]) => {
+              const confidenceInfo = confidenceLabels[info.confidence];
+              return (
+                <div
+                  key={key}
+                  className="p-3 rounded-lg border bg-muted/30 text-sm"
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-medium">
+                      {allDimensions.find(d => d.id === key)?.name || key}
+                    </span>
+                    <span className={cn("text-xs", confidenceInfo.color)}>
+                      {confidenceInfo.label}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">{info.source}</p>
+                  {info.note && (
+                    <p className="text-xs text-muted-foreground mt-1 italic">
+                      {info.note}
+                    </p>
+                  )}
+                </div>
+              );
+            })}
+          </motion.div>
+        )}
+      </motion.div>
     </div>
   );
 }

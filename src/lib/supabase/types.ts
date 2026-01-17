@@ -140,6 +140,8 @@ export interface Persona {
   region: string;
   traits?: string[];           // 性格特点标签
   biography?: string;          // 简短人设描述
+  populationShare?: string;    // 人群占比（格式化字符串，如 "0.5%"）
+  populationShareRaw?: number; // 人群占比（原始数值）
 }
 
 // ============================================

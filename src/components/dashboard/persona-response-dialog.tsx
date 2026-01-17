@@ -14,6 +14,7 @@ import {
   ChevronUp,
   X,
   MessageCircle,
+  Percent,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -116,6 +117,13 @@ function PersonaCard({
             <span>{persona.cityTier}</span>
           </div>
         </div>
+
+        {/* 人群占比 */}
+        {persona.populationShare && (
+          <Badge variant="outline" className="flex-shrink-0 text-xs">
+            占比 {persona.populationShare}
+          </Badge>
+        )}
 
         {/* 置信度 */}
         {answer && (

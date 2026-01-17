@@ -1,6 +1,8 @@
 /**
  * InfVoices 角色生成器
+ *
  * 根据配置的维度和权重生成虚拟角色
+ * 支持维度间的条件概率依赖，确保生成的角色在统计学上合理
  */
 
 import type { Persona, DimensionConfig, WeightConfig } from "@/lib/supabase";
@@ -15,6 +17,19 @@ import {
   type DimensionOption,
   type CityInfo,
 } from "./dimensions";
+import {
+  ageToFamilyStatus,
+  ageToOccupation,
+  ageToEducation,
+  cityTierToIncome,
+  educationOccupationModifier,
+  occupationIncomeModifier,
+  selectByConditionalProbability,
+  combineConditionalProbabilities,
+  estimatePopulationShare,
+  formatPopulationShare,
+  dataSourceNotes,
+} from "./conditional-probabilities";
 
 // ============================================
 // 随机数工具
@@ -49,6 +64,18 @@ function weightedRandomChoice(options: DimensionOption[]): DimensionOption {
   }
 
   return options[options.length - 1];
+}
+
+/**
+ * 将维度选项转换为概率映射
+ */
+function optionsToProbMap(options: DimensionOption[]): Record<string, number> {
+  const map: Record<string, number> = {};
+  const total = options.reduce((sum, opt) => sum + opt.weight, 0);
+  for (const opt of options) {
+    map[opt.value] = opt.weight / total;
+  }
+  return map;
 }
 
 // ============================================
@@ -217,26 +244,40 @@ function getLabel(dimensionId: string, value: string): string {
 }
 
 // ============================================
-// 核心生成函数
+// 核心生成函数（使用条件概率）
 // ============================================
 
 /**
  * 根据配置生成单个角色
+ *
+ * 生成顺序遵循依赖关系：
+ * 1. 性别（独立）
+ * 2. 年龄段（独立）
+ * 3. 地区（独立）
+ * 4. 城市线级（独立，但城市选择依赖地区）
+ * 5. 学历（依赖年龄）
+ * 6. 职业（依赖年龄、学历）
+ * 7. 收入（依赖城市、职业）
+ * 8. 家庭状态（依赖年龄）
  */
 export function generatePersona(
   dimensionConfig: DimensionConfig = {},
   weightConfig: WeightConfig = {}
 ): Persona {
   const selectedValues: Record<string, string> = {};
+  const baseProbabilities: Record<string, Record<string, number>> = {};
 
-  // 遍历所有维度，根据配置选择值
-  for (const dimension of allDimensions) {
-    const dimId = dimension.id;
+  // 辅助函数：获取维度的可用选项和概率
+  const getDimensionOptions = (dimId: string): DimensionOption[] => {
+    const dimension = dimensionMap.get(dimId);
+    if (!dimension) return [];
+
     const allowedValues = (dimensionConfig as Record<string, string[]>)[dimId];
     const customWeights = weightConfig[dimId];
 
-    // 筛选可用选项
     let options = dimension.options;
+
+    // 筛选允许的值
     if (allowedValues && allowedValues.length > 0) {
       options = options.filter((opt) => allowedValues.includes(opt.value));
     }
@@ -249,15 +290,108 @@ export function generatePersona(
       }));
     }
 
-    // 权重选择
-    const selected = weightedRandomChoice(options);
-    selectedValues[dimId] = selected.value;
+    return options;
+  };
+
+  // 1. 生成性别（独立）
+  const genderOptions = getDimensionOptions("gender");
+  selectedValues.gender = weightedRandomChoice(genderOptions).value;
+  baseProbabilities.gender = optionsToProbMap(genderOptions);
+
+  // 2. 生成年龄段（独立）
+  const ageOptions = getDimensionOptions("ageRange");
+  selectedValues.ageRange = weightedRandomChoice(ageOptions).value;
+  baseProbabilities.ageRange = optionsToProbMap(ageOptions);
+
+  // 3. 生成地区（独立）
+  const regionOptions = getDimensionOptions("region");
+  selectedValues.region = weightedRandomChoice(regionOptions).value;
+  baseProbabilities.region = optionsToProbMap(regionOptions);
+
+  // 4. 生成城市线级（独立）
+  const cityTierOptions = getDimensionOptions("cityTier");
+  selectedValues.cityTier = weightedRandomChoice(cityTierOptions).value;
+  baseProbabilities.cityTier = optionsToProbMap(cityTierOptions);
+
+  // 5. 生成学历（依赖年龄）
+  const educationOptions = getDimensionOptions("education");
+  const ageRange = selectedValues.ageRange;
+  const ageEducationProbs = ageToEducation[ageRange] || {};
+
+  // 合并基础权重和条件概率
+  const educationBaseProbs = optionsToProbMap(educationOptions);
+  const educationAllowedValues = educationOptions.map(o => o.value);
+  const filteredAgeEducationProbs: Record<string, number> = {};
+  for (const v of educationAllowedValues) {
+    filteredAgeEducationProbs[v] = ageEducationProbs[v] || educationBaseProbs[v] || 0;
   }
+
+  selectedValues.education = selectByConditionalProbability(
+    filteredAgeEducationProbs,
+    educationAllowedValues
+  );
+
+  // 6. 生成职业（依赖年龄、学历）
+  const occupationOptions = getDimensionOptions("occupation");
+  const ageOccupationProbs = ageToOccupation[ageRange] || {};
+  const educationModifier = educationOccupationModifier[selectedValues.education] || {};
+
+  // 应用学历修正因子
+  const modifiedOccupationProbs: Record<string, number> = {};
+  const occupationAllowedValues = occupationOptions.map(o => o.value);
+  for (const v of occupationAllowedValues) {
+    const baseProb = ageOccupationProbs[v] || 0;
+    const modifier = educationModifier[v] || 1;
+    modifiedOccupationProbs[v] = baseProb * modifier;
+  }
+
+  selectedValues.occupation = selectByConditionalProbability(
+    modifiedOccupationProbs,
+    occupationAllowedValues
+  );
+
+  // 7. 生成收入（依赖城市、职业）
+  const incomeLevelOptions = getDimensionOptions("incomeLevel");
+  const cityTier = selectedValues.cityTier;
+  const cityIncomeProbs = cityTierToIncome[cityTier] || {};
+  const occupationModifier = occupationIncomeModifier[selectedValues.occupation] || {};
+
+  // 合并城市和职业对收入的影响
+  const modifiedIncomeProbs: Record<string, number> = {};
+  const incomeAllowedValues = incomeLevelOptions.map(o => o.value);
+  for (const v of incomeAllowedValues) {
+    const baseProb = cityIncomeProbs[v] || 0;
+    const modifier = occupationModifier[v] || 1;
+    modifiedIncomeProbs[v] = baseProb * modifier;
+  }
+
+  selectedValues.incomeLevel = selectByConditionalProbability(
+    modifiedIncomeProbs,
+    incomeAllowedValues
+  );
+
+  // 8. 生成家庭状态（依赖年龄）
+  const familyStatusOptions = getDimensionOptions("familyStatus");
+  const ageFamilyProbs = ageToFamilyStatus[ageRange] || {};
+  const familyAllowedValues = familyStatusOptions.map(o => o.value);
+  const filteredAgeFamilyProbs: Record<string, number> = {};
+  for (const v of familyAllowedValues) {
+    filteredAgeFamilyProbs[v] = ageFamilyProbs[v] || 0;
+  }
+
+  selectedValues.familyStatus = selectByConditionalProbability(
+    filteredAgeFamilyProbs,
+    familyAllowedValues
+  );
 
   // 构建角色对象
   const age = generateAge(selectedValues.ageRange);
   const city = generateCity(selectedValues.region, selectedValues.cityTier);
   const income = generateIncome(selectedValues.incomeLevel);
+
+  // 计算人群占比
+  const populationShare = estimatePopulationShare(selectedValues, baseProbabilities);
+  const populationShareFormatted = formatPopulationShare(populationShare);
 
   const persona: Persona = {
     id: crypto.randomUUID(),
@@ -271,6 +405,8 @@ export function generatePersona(
     occupation: getLabel("occupation", selectedValues.occupation),
     familyStatus: getLabel("familyStatus", selectedValues.familyStatus),
     region: getLabel("region", selectedValues.region),
+    populationShare: populationShareFormatted,
+    populationShareRaw: populationShare,
   };
 
   // 添加额外属性
@@ -374,4 +510,11 @@ export function calculateSampleSize(
   const n = (z * z * p * (1 - p)) / (marginOfError * marginOfError);
 
   return Math.ceil(n);
+}
+
+/**
+ * 获取数据来源说明
+ */
+export function getDataSourceNotes() {
+  return dataSourceNotes;
 }
