@@ -25,7 +25,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Select,
   SelectContent,
@@ -384,7 +383,7 @@ export function PersonaResponseDialog({
         </div>
 
         {/* 响应列表 */}
-        <ScrollArea className="flex-1 -mx-6 px-6 min-h-0 max-h-[calc(85vh-200px)]">
+        <div className="flex-1 -mx-6 px-6 overflow-y-auto min-h-0" style={{ maxHeight: 'calc(85vh - 180px)' }}>
           <div className="space-y-3 py-4">
             {filteredResponses.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
@@ -407,7 +406,7 @@ export function PersonaResponseDialog({
               ))
             )}
           </div>
-        </ScrollArea>
+        </div>
       </DialogContent>
 
       {/* 聊天对话框 */}
