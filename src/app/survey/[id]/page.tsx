@@ -12,6 +12,9 @@ import {
   Users,
   SlidersHorizontal,
   Info,
+  Eye,
+  Loader2,
+  PieChart as PieChartIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
@@ -29,6 +32,14 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { PieChartComponent } from "@/components/charts";
 import {
   Tooltip,
   TooltipContent,
@@ -48,11 +59,11 @@ import type { AnalysisReport } from "@/lib/analysis";
 
 // 预设样本量选项
 const SAMPLE_SIZE_PRESETS = [
-  { value: 50, label: "50", description: "快速测试" },
-  { value: 100, label: "100", description: "小规模调研" },
-  { value: 300, label: "300", description: "标准样本" },
-  { value: 500, label: "500", description: "较大样本" },
-  { value: 1000, label: "1000", description: "大规模调研" },
+  { value: 30, label: "30", description: "快速验证" },
+  { value: 50, label: "50", description: "小规模测试" },
+  { value: 100, label: "100", description: "标准样本" },
+  { value: 200, label: "200", description: "较大样本" },
+  { value: 300, label: "300", description: "大规模调研" },
 ];
 
 export default function SurveyDetailPage() {
@@ -68,7 +79,7 @@ export default function SurveyDetailPage() {
   const [showExportDialog, setShowExportDialog] = useState(false);
 
   // 样本配置状态
-  const [sampleSize, setSampleSize] = useState<number>(50);
+  const [sampleSize, setSampleSize] = useState<number>(30);
   const [customSize, setCustomSize] = useState<string>("");
   const [isCustomSize, setIsCustomSize] = useState(false);
   const [audienceFilters, setAudienceFilters] = useState<DimensionConfig>({});
@@ -77,6 +88,11 @@ export default function SurveyDetailPage() {
 
   // 用户模型设置
   const [userModel, setUserModel] = useState<string | undefined>(undefined);
+
+  // 预览人群画像状态
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewPersonas, setPreviewPersonas] = useState<Persona[]>([]);
 
   // 计算当前活跃的筛选数量
   const activeFilterCount = useMemo(() => {
@@ -169,6 +185,68 @@ export default function SurveyDetailPage() {
     setAudienceFilters({});
     setSelectedPreset("");
   };
+
+  // 预览人群画像
+  const handlePreviewDemographics = () => {
+    setPreviewLoading(true);
+    setPreviewOpen(true);
+
+    // 使用较小的样本量快速预览
+    setTimeout(() => {
+      const previewSample = generatePersonas(Math.min(sampleSize, 50), audienceFilters);
+      setPreviewPersonas(previewSample);
+      setPreviewLoading(false);
+    }, 300);
+  };
+
+  // 计算预览人群的分布统计
+  const previewDemographics = useMemo(() => {
+    if (previewPersonas.length === 0) return [];
+
+    const dimensions: { key: keyof Persona; label: string }[] = [
+      { key: "gender", label: "性别" },
+      { key: "ageRange", label: "年龄" },
+      { key: "cityTier", label: "城市等级" },
+      { key: "education", label: "学历" },
+      { key: "incomeLevel", label: "收入水平" },
+      { key: "region", label: "地区" },
+    ];
+
+    const colors = [
+      "oklch(70% 0.15 280)",
+      "oklch(70% 0.15 230)",
+      "oklch(70% 0.15 180)",
+      "oklch(70% 0.15 150)",
+      "oklch(70% 0.15 90)",
+      "oklch(70% 0.15 30)",
+      "oklch(70% 0.15 0)",
+      "oklch(70% 0.15 330)",
+    ];
+
+    return dimensions.map((dim) => {
+      const counts: Record<string, number> = {};
+      previewPersonas.forEach((p) => {
+        const value = p[dim.key] as string;
+        if (value) {
+          counts[value] = (counts[value] || 0) + 1;
+        }
+      });
+
+      const data = Object.entries(counts)
+        .map(([name, value], index) => ({
+          name,
+          value,
+          color: colors[index % colors.length],
+        }))
+        .sort((a, b) => b.value - a.value);
+
+      return {
+        dimension: dim.key,
+        label: dim.label,
+        data,
+      };
+    });
+  }, [previewPersonas]);
 
   // 开始调研（生成角色并切换到执行页面）
   const handleStartSurvey = () => {
@@ -554,15 +632,26 @@ export default function SurveyDetailPage() {
                       </CardContent>
                     </Card>
 
-                    {/* 开始按钮 */}
-                    <Button
-                      size="lg"
-                      className="w-full gap-2 btn-gradient text-white h-14 text-lg"
-                      onClick={handleStartSurvey}
-                    >
-                      <Play className="h-5 w-5" />
-                      生成 {sampleSize} 个角色并开始调研
-                    </Button>
+                    {/* 操作按钮 */}
+                    <div className="flex gap-3">
+                      <Button
+                        variant="outline"
+                        size="lg"
+                        className="gap-2 h-14"
+                        onClick={handlePreviewDemographics}
+                      >
+                        <Eye className="h-5 w-5" />
+                        预览人群画像
+                      </Button>
+                      <Button
+                        size="lg"
+                        className="flex-1 gap-2 btn-gradient text-white h-14 text-lg"
+                        onClick={handleStartSurvey}
+                      >
+                        <Play className="h-5 w-5" />
+                        生成 {sampleSize} 个角色并开始调研
+                      </Button>
+                    </div>
                   </div>
 
                   {/* 右侧：调研概览 */}
@@ -733,6 +822,91 @@ export default function SurveyDetailPage() {
           </TooltipProvider>
         </motion.div>
       </motion.div>
+
+      {/* 预览人群画像对话框 */}
+      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+        <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <PieChartIcon className="h-5 w-5 text-primary" />
+              人群画像预览
+            </DialogTitle>
+            <DialogDescription>
+              基于当前筛选条件，预览生成 {Math.min(sampleSize, 50)} 个样本的人口分布
+              {sampleSize > 50 && (
+                <span className="text-muted-foreground ml-1">
+                  （实际生成 {sampleSize} 个时分布相似）
+                </span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+
+          {previewLoading ? (
+            <div className="flex items-center justify-center py-16">
+              <div className="text-center">
+                <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-3" />
+                <p className="text-sm text-muted-foreground">正在生成预览...</p>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {/* 统计概览 */}
+              <div className="grid grid-cols-3 gap-4">
+                <div className="p-4 rounded-lg bg-primary/5 border border-primary/20 text-center">
+                  <p className="text-2xl font-bold text-primary">{previewPersonas.length}</p>
+                  <p className="text-xs text-muted-foreground">预览样本数</p>
+                </div>
+                <div className="p-4 rounded-lg bg-muted/50 text-center">
+                  <p className="text-2xl font-bold">{activeFilterCount}</p>
+                  <p className="text-xs text-muted-foreground">筛选条件</p>
+                </div>
+                <div className="p-4 rounded-lg bg-muted/50 text-center">
+                  <p className="text-2xl font-bold">{sampleSize}</p>
+                  <p className="text-xs text-muted-foreground">目标样本量</p>
+                </div>
+              </div>
+
+              {/* 人口学分布图表 */}
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {previewDemographics.map((demo) => (
+                  <Card key={demo.dimension} className="overflow-hidden">
+                    <CardHeader className="pb-2 pt-4 px-4">
+                      <CardTitle className="text-sm font-medium">{demo.label}分布</CardTitle>
+                    </CardHeader>
+                    <CardContent className="px-4 pb-4">
+                      <div className="w-full overflow-hidden">
+                        <PieChartComponent
+                          data={demo.data}
+                          size="sm"
+                          showLegend={true}
+                          showLabels={false}
+                        />
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+
+              {/* 操作按钮 */}
+              <div className="flex justify-end gap-3 pt-2">
+                <Button variant="outline" onClick={() => setPreviewOpen(false)}>
+                  关闭
+                </Button>
+                <Button
+                  className="gap-2"
+                  onClick={() => {
+                    setPreviewOpen(false);
+                    handleStartSurvey();
+                  }}
+                >
+                  <Play className="h-4 w-4" />
+                  确认并开始调研
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

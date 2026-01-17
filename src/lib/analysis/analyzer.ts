@@ -19,6 +19,8 @@ import type {
   CrossAnalysisRow,
   AnalysisReport,
   ReportSummary,
+  AnalysisInsight,
+  InsightType,
 } from "./types";
 import { CHART_COLORS, DEMOGRAPHIC_LABELS } from "./types";
 
@@ -45,6 +47,9 @@ export function generateAnalysisReport(
     analyzeQuestion(q, completedResponses)
   );
 
+  // 生成关键洞察
+  const insights = generateInsights(questionStats, demographics, summary);
+
   return {
     surveyId,
     surveyTitle,
@@ -52,7 +57,135 @@ export function generateAnalysisReport(
     summary,
     demographics,
     questions: questionStats,
+    insights,
   };
+}
+
+/**
+ * 生成关键洞察
+ */
+function generateInsights(
+  questionStats: (AnswerStatistics | ScaleStatistics)[],
+  demographics: DemographicDistribution[],
+  summary: ReportSummary
+): AnalysisInsight[] {
+  const insights: AnalysisInsight[] = [];
+
+  // 1. 分析选择题的主导选项
+  questionStats.forEach((stat) => {
+    if (
+      stat.questionType === "single_choice" ||
+      stat.questionType === "multiple_choice"
+    ) {
+      const sorted = [...stat.distribution].sort((a, b) => b.percentage - a.percentage);
+      if (sorted.length >= 2) {
+        const top = sorted[0];
+        const second = sorted[1];
+        const diff = top.percentage - second.percentage;
+
+        if (diff >= 20) {
+          insights.push({
+            type: "trend" as InsightType,
+            title: `「${top.label}」占据主导地位`,
+            description: `在"${stat.questionTitle}"问题中，「${top.label}」以 ${top.percentage.toFixed(1)}% 的占比领先，比第二名高出 ${diff.toFixed(1)} 个百分点，表现出明显的用户偏好。`,
+            relatedQuestions: [stat.questionId],
+            confidence: Math.min(0.95, 0.7 + diff / 100),
+          });
+        } else if (diff < 5 && top.percentage > 20) {
+          insights.push({
+            type: "anomaly" as InsightType,
+            title: `选项竞争激烈`,
+            description: `在"${stat.questionTitle}"问题中，「${top.label}」(${top.percentage.toFixed(1)}%) 和「${second.label}」(${second.percentage.toFixed(1)}%) 差距较小，用户偏好较为分散。`,
+            relatedQuestions: [stat.questionId],
+            confidence: 0.75,
+          });
+        }
+      }
+    }
+  });
+
+  // 2. 分析量表题的满意度
+  questionStats.forEach((stat) => {
+    if (stat.questionType === "scale" && "mean" in stat) {
+      const scaleStats = stat as ScaleStatistics;
+      const maxScale = scaleStats.max || 5;
+      const midPoint = (maxScale + 1) / 2;
+
+      if (scaleStats.mean >= midPoint + 1) {
+        insights.push({
+          type: "sentiment" as InsightType,
+          title: `高满意度评价`,
+          description: `"${stat.questionTitle}"的平均分为 ${scaleStats.mean.toFixed(2)}（满分${maxScale}），整体反馈积极正向。`,
+          relatedQuestions: [stat.questionId],
+          confidence: 0.85,
+        });
+      } else if (scaleStats.mean <= midPoint - 0.5) {
+        insights.push({
+          type: "recommendation" as InsightType,
+          title: `需关注的低分项`,
+          description: `"${stat.questionTitle}"的平均分为 ${scaleStats.mean.toFixed(2)}（满分${maxScale}），低于中位值，可能需要改进。`,
+          relatedQuestions: [stat.questionId],
+          confidence: 0.8,
+        });
+      }
+
+      // 分析标准差（意见一致性）
+      if (scaleStats.standardDeviation < 0.8) {
+        insights.push({
+          type: "correlation" as InsightType,
+          title: `意见高度一致`,
+          description: `"${stat.questionTitle}"的标准差仅为 ${scaleStats.standardDeviation.toFixed(2)}，表明受访者意见较为一致。`,
+          relatedQuestions: [stat.questionId],
+          confidence: 0.9,
+        });
+      } else if (scaleStats.standardDeviation > 1.5) {
+        insights.push({
+          type: "demographic_difference" as InsightType,
+          title: `意见分歧明显`,
+          description: `"${stat.questionTitle}"的标准差达到 ${scaleStats.standardDeviation.toFixed(2)}，表明不同人群有不同看法，建议做进一步细分分析。`,
+          relatedQuestions: [stat.questionId],
+          confidence: 0.85,
+        });
+      }
+    }
+  });
+
+  // 3. 分析人口学分布特征
+  demographics.forEach((demo) => {
+    if (demo.segments.length >= 2) {
+      const sorted = [...demo.segments].sort((a, b) => b.percentage - a.percentage);
+      const top = sorted[0];
+
+      if (top.percentage >= 40) {
+        insights.push({
+          type: "demographic_difference" as InsightType,
+          title: `${demo.label}分布集中`,
+          description: `样本中「${top.label}」占比 ${top.percentage.toFixed(1)}%，${demo.label}分布相对集中。`,
+          confidence: 0.8,
+        });
+      }
+    }
+  });
+
+  // 4. 置信度洞察
+  if (summary.averageConfidence >= 0.85) {
+    insights.push({
+      type: "trend" as InsightType,
+      title: `回答置信度高`,
+      description: `整体回答置信度达到 ${(summary.averageConfidence * 100).toFixed(0)}%，AI 模拟的用户回答具有较高可信度。`,
+      confidence: summary.averageConfidence,
+    });
+  } else if (summary.averageConfidence < 0.6) {
+    insights.push({
+      type: "recommendation" as InsightType,
+      title: `置信度偏低`,
+      description: `整体回答置信度为 ${(summary.averageConfidence * 100).toFixed(0)}%，部分问题可能设计不够清晰，建议优化问卷。`,
+      confidence: 0.7,
+    });
+  }
+
+  // 限制最多返回6条洞察
+  return insights.slice(0, 6);
 }
 
 /**

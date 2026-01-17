@@ -316,7 +316,7 @@ export function PersonaResponseDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col">
+      <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col overflow-hidden">
         <DialogHeader>
           <DialogTitle className="pr-8">
             <span className="text-muted-foreground text-sm font-normal block mb-1">
@@ -343,7 +343,7 @@ export function PersonaResponseDialog({
             <SelectTrigger className="w-32 h-8">
               <SelectValue placeholder="选择维度" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="max-h-60">
               <SelectItem value="all">全部</SelectItem>
               {Object.entries(DEMOGRAPHIC_LABELS).map(([key, label]) => (
                 <SelectItem key={key} value={key}>
@@ -358,7 +358,7 @@ export function PersonaResponseDialog({
               <SelectTrigger className="w-32 h-8">
                 <SelectValue placeholder="选择值" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="max-h-60">
                 <SelectItem value="all">全部</SelectItem>
                 {filterOptions.map((value) => (
                   <SelectItem key={value} value={value}>
@@ -384,7 +384,7 @@ export function PersonaResponseDialog({
         </div>
 
         {/* 响应列表 */}
-        <ScrollArea className="flex-1 -mx-6 px-6">
+        <ScrollArea className="flex-1 -mx-6 px-6 min-h-0 max-h-[calc(85vh-200px)]">
           <div className="space-y-3 py-4">
             {filteredResponses.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
