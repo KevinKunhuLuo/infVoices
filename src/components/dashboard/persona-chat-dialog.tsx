@@ -210,7 +210,7 @@ ${context.answer.reasoning ? `我这样选择的原因是：${context.answer.rea
       <DialogContent className="max-w-lg max-h-[85vh] flex flex-col p-0">
         {/* 头部 */}
         <DialogHeader className="p-4 border-b">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between pr-8">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
                 <User className="h-5 w-5 text-primary" />

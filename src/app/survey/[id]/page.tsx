@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useParams } from "next/navigation";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft,
   Play,
@@ -12,9 +12,9 @@ import {
   Users,
   SlidersHorizontal,
   Info,
-  Eye,
   Loader2,
   PieChart as PieChartIcon,
+  Sparkles,
 } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
@@ -32,13 +32,6 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { PieChartComponent } from "@/components/charts";
 import {
   Tooltip,
@@ -90,14 +83,39 @@ export default function SurveyDetailPage() {
   const [userModel, setUserModel] = useState<string | undefined>(undefined);
 
   // 预览人群画像状态
-  const [previewOpen, setPreviewOpen] = useState(false);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewPersonas, setPreviewPersonas] = useState<Persona[]>([]);
+  const previewDebounceRef = useRef<NodeJS.Timeout | null>(null);
 
   // 计算当前活跃的筛选数量
   const activeFilterCount = useMemo(() => {
     return Object.values(audienceFilters).filter((v) => v && v.length > 0).length;
   }, [audienceFilters]);
+
+  // 实时生成预览样本（带防抖）
+  const generatePreview = useCallback(() => {
+    setPreviewLoading(true);
+    // 生成 20 个预览样本
+    const previewSample = generatePersonas(20, audienceFilters);
+    setPreviewPersonas(previewSample);
+    setPreviewLoading(false);
+  }, [audienceFilters]);
+
+  // 当筛选条件变化时自动生成预览
+  useEffect(() => {
+    if (previewDebounceRef.current) {
+      clearTimeout(previewDebounceRef.current);
+    }
+    previewDebounceRef.current = setTimeout(() => {
+      generatePreview();
+    }, 300);
+
+    return () => {
+      if (previewDebounceRef.current) {
+        clearTimeout(previewDebounceRef.current);
+      }
+    };
+  }, [audienceFilters, generatePreview]);
 
   // 加载问卷数据和用户设置
   useEffect(() => {
@@ -186,41 +204,24 @@ export default function SurveyDetailPage() {
     setSelectedPreset("");
   };
 
-  // 预览人群画像
-  const handlePreviewDemographics = () => {
-    setPreviewLoading(true);
-    setPreviewOpen(true);
-
-    // 使用较小的样本量快速预览
-    setTimeout(() => {
-      const previewSample = generatePersonas(Math.min(sampleSize, 50), audienceFilters);
-      setPreviewPersonas(previewSample);
-      setPreviewLoading(false);
-    }, 300);
-  };
-
-  // 计算预览人群的分布统计
+  // 计算预览人群的分布统计（只显示4个核心维度）
   const previewDemographics = useMemo(() => {
     if (previewPersonas.length === 0) return [];
 
     const dimensions: { key: keyof Persona; label: string }[] = [
       { key: "gender", label: "性别" },
       { key: "ageRange", label: "年龄" },
-      { key: "cityTier", label: "城市等级" },
-      { key: "education", label: "学历" },
-      { key: "incomeLevel", label: "收入水平" },
-      { key: "region", label: "地区" },
+      { key: "cityTier", label: "城市" },
+      { key: "incomeLevel", label: "收入" },
     ];
 
     const colors = [
-      "oklch(70% 0.15 280)",
-      "oklch(70% 0.15 230)",
-      "oklch(70% 0.15 180)",
-      "oklch(70% 0.15 150)",
-      "oklch(70% 0.15 90)",
-      "oklch(70% 0.15 30)",
-      "oklch(70% 0.15 0)",
-      "oklch(70% 0.15 330)",
+      "oklch(65% 0.18 260)",
+      "oklch(70% 0.16 200)",
+      "oklch(72% 0.14 160)",
+      "oklch(68% 0.15 120)",
+      "oklch(70% 0.12 80)",
+      "oklch(66% 0.14 40)",
     ];
 
     return dimensions.map((dim) => {
@@ -633,67 +634,127 @@ export default function SurveyDetailPage() {
                     </Card>
 
                     {/* 操作按钮 */}
-                    <div className="flex gap-3">
-                      <Button
-                        variant="outline"
-                        size="lg"
-                        className="gap-2 h-14"
-                        onClick={handlePreviewDemographics}
-                      >
-                        <Eye className="h-5 w-5" />
-                        预览人群画像
-                      </Button>
-                      <Button
-                        size="lg"
-                        className="flex-1 gap-2 btn-gradient text-white h-14 text-lg"
-                        onClick={handleStartSurvey}
-                      >
-                        <Play className="h-5 w-5" />
-                        生成 {sampleSize} 个角色并开始调研
-                      </Button>
-                    </div>
+                    <Button
+                      size="lg"
+                      className="w-full gap-2 btn-gradient text-white h-14 text-lg"
+                      onClick={handleStartSurvey}
+                    >
+                      <Play className="h-5 w-5" />
+                      生成 {sampleSize} 个角色并开始调研
+                    </Button>
                   </div>
 
-                  {/* 右侧：调研概览 */}
+                  {/* 右侧：实时人群画像预览 */}
                   <div className="space-y-4">
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-lg">调研概览</CardTitle>
+                    <Card className="overflow-hidden border-primary/20">
+                      <CardHeader className="pb-3 bg-gradient-to-br from-primary/5 to-transparent">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <div className="p-1.5 rounded-lg bg-primary/10">
+                              <PieChartIcon className="h-4 w-4 text-primary" />
+                            </div>
+                            <CardTitle className="text-base">人群画像预览</CardTitle>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0"
+                            onClick={generatePreview}
+                            disabled={previewLoading}
+                          >
+                            <RefreshCw className={cn("h-3.5 w-3.5", previewLoading && "animate-spin")} />
+                          </Button>
+                        </div>
+                        <CardDescription className="text-xs mt-1">
+                          基于当前筛选条件实时预览
+                        </CardDescription>
                       </CardHeader>
-                      <CardContent className="space-y-4">
-                        <div>
-                          <p className="text-sm text-muted-foreground">问卷标题</p>
-                          <p className="font-medium">{survey.title}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm text-muted-foreground">问题数量</p>
-                          <p className="font-medium">{survey.questions.length} 道题目</p>
-                        </div>
-                        <div>
-                          <p className="text-sm text-muted-foreground">预计样本量</p>
-                          <p className="font-medium">{sampleSize} 个角色</p>
-                        </div>
-                        <div>
-                          <p className="text-sm text-muted-foreground">预计耗时</p>
-                          <p className="font-medium">约 {Math.ceil(sampleSize / 5 * 3)} 秒</p>
-                        </div>
+                      <CardContent className="pt-3 pb-4">
+                        <AnimatePresence mode="wait">
+                          {previewLoading ? (
+                            <motion.div
+                              key="loading"
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                              exit={{ opacity: 0 }}
+                              className="flex items-center justify-center py-8"
+                            >
+                              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                            </motion.div>
+                          ) : (
+                            <motion.div
+                              key="content"
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                              exit={{ opacity: 0 }}
+                              className="space-y-4"
+                            >
+                              {/* 预览样本数指示 */}
+                              <div className="flex items-center justify-center gap-2 py-2 px-3 bg-muted/50 rounded-lg">
+                                <Sparkles className="h-3.5 w-3.5 text-primary" />
+                                <span className="text-xs text-muted-foreground">
+                                  预览样本: <strong className="text-foreground">{previewPersonas.length}</strong> 人
+                                </span>
+                              </div>
+
+                              {/* 人口分布图表网格 */}
+                              <div className="grid grid-cols-2 gap-3">
+                                {previewDemographics.map((demo) => (
+                                  <motion.div
+                                    key={demo.dimension}
+                                    initial={{ opacity: 0, scale: 0.95 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    transition={{ duration: 0.2 }}
+                                    className="bg-muted/30 rounded-lg p-2 border border-border/50"
+                                  >
+                                    <p className="text-xs font-medium text-muted-foreground mb-1 text-center">
+                                      {demo.label}
+                                    </p>
+                                    <div className="w-full overflow-hidden" style={{ height: 100 }}>
+                                      <PieChartComponent
+                                        data={demo.data}
+                                        size="sm"
+                                        showLegend={false}
+                                        showLabels={true}
+                                        height={100}
+                                        outerRadius={35}
+                                        innerRadius={15}
+                                      />
+                                    </div>
+                                  </motion.div>
+                                ))}
+                              </div>
+
+                              {/* 筛选条件提示 */}
+                              {activeFilterCount > 0 && (
+                                <div className="text-xs text-muted-foreground text-center pt-1">
+                                  已应用 <strong className="text-foreground">{activeFilterCount}</strong> 个筛选条件
+                                </div>
+                              )}
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
                       </CardContent>
                     </Card>
 
+                    {/* 调研概览 */}
                     <Card>
-                      <CardHeader>
-                        <CardTitle className="text-lg">人群权重说明</CardTitle>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-sm font-medium text-muted-foreground">调研概览</CardTitle>
                       </CardHeader>
-                      <CardContent className="text-sm text-muted-foreground space-y-2">
-                        <p>
-                          角色生成基于<strong className="text-foreground">第七次全国人口普查数据</strong>（2020年）的权重分布。
-                        </p>
-                        <p>
-                          如不进行筛选，将按照真实人口比例生成代表性样本。
-                        </p>
-                        <p>
-                          筛选后仍保持各维度内的相对权重比例。
-                        </p>
+                      <CardContent className="space-y-3 text-sm">
+                        <div className="flex justify-between items-center">
+                          <span className="text-muted-foreground">问题数量</span>
+                          <span className="font-medium">{survey.questions.length} 道</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-muted-foreground">目标样本</span>
+                          <span className="font-medium">{sampleSize} 人</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-muted-foreground">预计耗时</span>
+                          <span className="font-medium">~{Math.ceil(sampleSize / 5 * 3)}秒</span>
+                        </div>
                       </CardContent>
                     </Card>
                   </div>
@@ -822,91 +883,6 @@ export default function SurveyDetailPage() {
           </TooltipProvider>
         </motion.div>
       </motion.div>
-
-      {/* 预览人群画像对话框 */}
-      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
-        <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <PieChartIcon className="h-5 w-5 text-primary" />
-              人群画像预览
-            </DialogTitle>
-            <DialogDescription>
-              基于当前筛选条件，预览生成 {Math.min(sampleSize, 50)} 个样本的人口分布
-              {sampleSize > 50 && (
-                <span className="text-muted-foreground ml-1">
-                  （实际生成 {sampleSize} 个时分布相似）
-                </span>
-              )}
-            </DialogDescription>
-          </DialogHeader>
-
-          {previewLoading ? (
-            <div className="flex items-center justify-center py-16">
-              <div className="text-center">
-                <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-3" />
-                <p className="text-sm text-muted-foreground">正在生成预览...</p>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-6">
-              {/* 统计概览 */}
-              <div className="grid grid-cols-3 gap-4">
-                <div className="p-4 rounded-lg bg-primary/5 border border-primary/20 text-center">
-                  <p className="text-2xl font-bold text-primary">{previewPersonas.length}</p>
-                  <p className="text-xs text-muted-foreground">预览样本数</p>
-                </div>
-                <div className="p-4 rounded-lg bg-muted/50 text-center">
-                  <p className="text-2xl font-bold">{activeFilterCount}</p>
-                  <p className="text-xs text-muted-foreground">筛选条件</p>
-                </div>
-                <div className="p-4 rounded-lg bg-muted/50 text-center">
-                  <p className="text-2xl font-bold">{sampleSize}</p>
-                  <p className="text-xs text-muted-foreground">目标样本量</p>
-                </div>
-              </div>
-
-              {/* 人口学分布图表 */}
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {previewDemographics.map((demo) => (
-                  <Card key={demo.dimension} className="overflow-hidden">
-                    <CardHeader className="pb-2 pt-4 px-4">
-                      <CardTitle className="text-sm font-medium">{demo.label}分布</CardTitle>
-                    </CardHeader>
-                    <CardContent className="px-4 pb-4">
-                      <div className="w-full overflow-hidden">
-                        <PieChartComponent
-                          data={demo.data}
-                          size="sm"
-                          showLegend={true}
-                          showLabels={false}
-                        />
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-
-              {/* 操作按钮 */}
-              <div className="flex justify-end gap-3 pt-2">
-                <Button variant="outline" onClick={() => setPreviewOpen(false)}>
-                  关闭
-                </Button>
-                <Button
-                  className="gap-2"
-                  onClick={() => {
-                    setPreviewOpen(false);
-                    handleStartSurvey();
-                  }}
-                >
-                  <Play className="h-4 w-4" />
-                  确认并开始调研
-                </Button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
     </>
   );
 }
