@@ -271,21 +271,23 @@ export function AnalysisDashboard({ report, responses = [], questions = [], onEx
                 .filter((d) => d.dimension !== selectedDemographic)
                 .slice(0, 5)
                 .map((demo) => (
-                  <Card key={demo.dimension} className="hover:shadow-md transition-shadow overflow-hidden">
+                  <Card key={demo.dimension} className="hover:shadow-md transition-shadow">
                     <CardHeader className="pb-2">
                       <CardTitle className="text-sm">{demo.label}</CardTitle>
                     </CardHeader>
-                    <CardContent className="pb-4">
-                      <PieChartComponent
-                        data={demo.segments.map((s) => ({
-                          name: s.label,
-                          value: s.count,
-                          color: s.color,
-                        }))}
-                        showLegend={true}
-                        showLabels={false}
-                        size="sm"
-                      />
+                    <CardContent className="pb-4 overflow-hidden">
+                      <div className="w-full overflow-hidden">
+                        <PieChartComponent
+                          data={demo.segments.map((s) => ({
+                            name: s.label,
+                            value: s.count,
+                            color: s.color,
+                          }))}
+                          showLegend={true}
+                          showLabels={false}
+                          size="sm"
+                        />
+                      </div>
                     </CardContent>
                   </Card>
                 ))}
@@ -540,33 +542,44 @@ function QuestionAnalysisCard({
               <h4 className="text-sm font-medium text-muted-foreground">
                 答案分布 {hasResponses && <span className="text-xs">(点击查看详情)</span>}
               </h4>
-              {stats.distribution.slice(0, 6).map((item, i) => (
-                <button
-                  key={item.value}
-                  className={cn(
-                    "w-full text-left space-y-1 p-2 -mx-2 rounded-lg transition-colors",
-                    hasResponses && "hover:bg-muted/50 cursor-pointer"
-                  )}
-                  onClick={() => hasResponses && handleViewResponses(item.value, item.label)}
-                  disabled={!hasResponses}
-                >
-                  <div className="flex justify-between text-sm">
-                    <span className="truncate max-w-[200px]">{item.label}</span>
-                    <span className="font-medium">
-                      {item.count} ({item.percentage.toFixed(1)}%)
-                    </span>
-                  </div>
-                  <div className="h-2 bg-muted rounded-full overflow-hidden">
-                    <motion.div
-                      initial={{ width: 0 }}
-                      animate={{ width: `${item.percentage}%` }}
-                      transition={{ duration: 0.5, delay: i * 0.05 }}
-                      className="h-full rounded-full"
-                      style={{ backgroundColor: item.color }}
-                    />
-                  </div>
-                </button>
-              ))}
+              <div className="space-y-2">
+                {stats.distribution.slice(0, 6).map((item, i) => (
+                  <button
+                    key={item.value}
+                    className={cn(
+                      "w-full text-left rounded-lg transition-colors",
+                      hasResponses && "hover:bg-muted/50 cursor-pointer p-2"
+                    )}
+                    onClick={() => hasResponses && handleViewResponses(item.value, item.label)}
+                    disabled={!hasResponses}
+                  >
+                    <div className="flex items-center gap-3">
+                      {/* 排名指示器 */}
+                      <span className="text-xs text-muted-foreground w-4 shrink-0">
+                        {i + 1}
+                      </span>
+                      {/* 主内容区 */}
+                      <div className="flex-1 min-w-0 space-y-1.5">
+                        <div className="flex justify-between items-center gap-2">
+                          <span className="text-sm truncate">{item.label}</span>
+                          <span className="text-sm font-medium shrink-0">
+                            {item.count} ({item.percentage.toFixed(1)}%)
+                          </span>
+                        </div>
+                        <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                          <motion.div
+                            initial={{ width: 0 }}
+                            animate={{ width: `${item.percentage}%` }}
+                            transition={{ duration: 0.5, delay: i * 0.05 }}
+                            className="h-full rounded-full"
+                            style={{ backgroundColor: item.color }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </CardContent>

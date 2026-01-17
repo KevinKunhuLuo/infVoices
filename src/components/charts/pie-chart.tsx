@@ -209,11 +209,11 @@ export function PieChartComponent({
   const centerY = chartAreaHeight / 2;
 
   return (
-    <div className={cn("w-full", className)} style={{ height }}>
+    <div className={cn("w-full overflow-hidden", className)} style={{ height }}>
       {title && (
         <h3 className="text-sm font-medium text-center mb-1 truncate px-2">{title}</h3>
       )}
-      <ResponsiveContainer width="100%" height={height - titleHeight}>
+      <ResponsiveContainer width="100%" height={height - titleHeight} className="overflow-hidden">
         <RechartsPieChart>
           <Pie
             data={dataWithPercentage}

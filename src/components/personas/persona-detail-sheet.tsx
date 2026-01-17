@@ -62,8 +62,8 @@ export function PersonaDetailSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-[450px] sm:max-w-[450px] overflow-y-auto">
-        <SheetHeader className="text-left">
+      <SheetContent className="w-[450px] sm:max-w-[450px] overflow-y-auto px-6">
+        <SheetHeader className="text-left pt-6">
           <div className="flex items-center gap-4">
             <Avatar className={cn("h-16 w-16", avatarColor)}>
               <AvatarFallback className="text-white text-xl font-medium">
@@ -80,7 +80,7 @@ export function PersonaDetailSheet({
           </div>
         </SheetHeader>
 
-        <div className="mt-6 space-y-6">
+        <div className="mt-6 pb-6 space-y-6">
           {/* 人设描述 */}
           {persona.biography && (
             <div className="relative">
