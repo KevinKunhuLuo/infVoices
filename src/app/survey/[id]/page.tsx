@@ -32,7 +32,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { PieChartComponent } from "@/components/charts";
+import { MiniPieChart } from "@/components/charts";
 import {
   Tooltip,
   TooltipContent,
@@ -707,20 +707,12 @@ export default function SurveyDetailPage() {
                                     transition={{ duration: 0.2 }}
                                     className="bg-muted/30 rounded-lg p-2 border border-border/50"
                                   >
-                                    <p className="text-xs font-medium text-muted-foreground mb-1 text-center">
-                                      {demo.label}
-                                    </p>
-                                    <div className="w-full overflow-hidden" style={{ height: 100 }}>
-                                      <PieChartComponent
-                                        data={demo.data}
-                                        size="sm"
-                                        showLegend={false}
-                                        showLabels={true}
-                                        height={100}
-                                        outerRadius={35}
-                                        innerRadius={15}
-                                      />
-                                    </div>
+                                    <MiniPieChart
+                                      data={demo.data}
+                                      title={demo.label}
+                                      height={150}
+                                      interactive={true}
+                                    />
                                   </motion.div>
                                 ))}
                               </div>

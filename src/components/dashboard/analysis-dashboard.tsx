@@ -219,6 +219,7 @@ export function AnalysisDashboard({ report, responses = [], questions = [], onEx
                             title={currentDemographic?.label}
                             size="lg"
                             showLabels={true}
+                            interactive={true}
                           />
                         ) : (
                           <BarChartComponent
@@ -286,6 +287,7 @@ export function AnalysisDashboard({ report, responses = [], questions = [], onEx
                           showLegend={true}
                           showLabels={false}
                           size="sm"
+                          interactive={true}
                         />
                       </div>
                     </CardContent>
@@ -510,7 +512,7 @@ function QuestionAnalysisCard({
                   colorScheme="gradient"
                 />
               ) : (
-                <PieChartComponent data={chartData} size="md" showLabels={true} />
+                <PieChartComponent data={chartData} size="md" showLabels={true} interactive={true} />
               )}
             </div>
 
