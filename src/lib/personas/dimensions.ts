@@ -323,34 +323,49 @@ export const citiesByTier: Record<string, string[]> = {
 
 /**
  * 根据地区和城市线级获取匹配的城市
+ * @param allowFallback 是否允许fallback到其他线级（当明确筛选城市线级时应设为false）
  */
-export function getCitiesByRegionAndTier(region: string, cityTier: string): CityInfo[] {
+export function getCitiesByRegionAndTier(region: string, cityTier: string, allowFallback: boolean = true): CityInfo[] {
   const regionCities = citiesByRegion[region] || citiesByRegion.other;
   const matchingCities = regionCities.filter(city => city.tier === cityTier);
 
-  // 如果该地区没有对应线级的城市，返回相近线级的城市
-  if (matchingCities.length === 0) {
-    // 按优先级尝试相近的线级
-    const tierPriority: Record<string, string[]> = {
-      tier1: ["newTier1", "tier2", "tier3", "tier4plus"],
-      newTier1: ["tier1", "tier2", "tier3", "tier4plus"],
-      tier2: ["newTier1", "tier3", "tier1", "tier4plus"],
-      tier3: ["tier2", "tier4plus", "newTier1", "tier1"],
-      tier4plus: ["tier3", "tier2", "newTier1", "tier1"],
-    };
-
-    for (const fallbackTier of tierPriority[cityTier] || []) {
-      const fallbackCities = regionCities.filter(city => city.tier === fallbackTier);
-      if (fallbackCities.length > 0) {
-        return fallbackCities;
-      }
-    }
-
-    // 如果都没有，返回该地区的所有城市
-    return regionCities;
+  // 如果不允许fallback或者找到了匹配的城市，直接返回
+  if (!allowFallback || matchingCities.length > 0) {
+    return matchingCities;
   }
 
-  return matchingCities;
+  // 如果该地区没有对应线级的城市，返回相近线级的城市
+  // 按优先级尝试相近的线级
+  const tierPriority: Record<string, string[]> = {
+    tier1: ["newTier1", "tier2", "tier3", "tier4plus"],
+    newTier1: ["tier1", "tier2", "tier3", "tier4plus"],
+    tier2: ["newTier1", "tier3", "tier1", "tier4plus"],
+    tier3: ["tier2", "tier4plus", "newTier1", "tier1"],
+    tier4plus: ["tier3", "tier2", "newTier1", "tier1"],
+  };
+
+  for (const fallbackTier of tierPriority[cityTier] || []) {
+    const fallbackCities = regionCities.filter(city => city.tier === fallbackTier);
+    if (fallbackCities.length > 0) {
+      return fallbackCities;
+    }
+  }
+
+  // 如果都没有，返回该地区的所有城市
+  return regionCities;
+}
+
+/**
+ * 获取拥有指定城市线级的地区列表
+ */
+export function getRegionsWithCityTier(cityTier: string): string[] {
+  const regions: string[] = [];
+  for (const [region, cities] of Object.entries(citiesByRegion)) {
+    if (cities.some(city => city.tier === cityTier)) {
+      regions.push(region);
+    }
+  }
+  return regions;
 }
 
 // ============================================

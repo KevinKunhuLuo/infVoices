@@ -11,6 +11,7 @@ import {
   dimensionMap,
   citiesByTier,
   getCitiesByRegionAndTier,
+  getRegionsWithCityTier,
   surnames,
   maleNames,
   femaleNames,
@@ -111,13 +112,14 @@ function generateAge(ageRange: string): number {
 /**
  * 根据地区和城市线级生成具体城市
  * 确保城市与地区匹配
+ * @param allowFallback 是否允许fallback到其他线级城市
  */
-function generateCity(region: string, cityTier: string): string {
-  const matchingCities = getCitiesByRegionAndTier(region, cityTier);
+function generateCity(region: string, cityTier: string, allowFallback: boolean = true): string {
+  const matchingCities = getCitiesByRegionAndTier(region, cityTier, allowFallback);
   if (matchingCities.length > 0) {
     return randomChoice(matchingCities).name;
   }
-  // 最终fallback到旧逻辑
+  // 最终fallback到全局按线级的城市列表
   const cities = citiesByTier[cityTier] || citiesByTier.tier3;
   return randomChoice(cities);
 }
@@ -303,15 +305,34 @@ export function generatePersona(
   selectedValues.ageRange = weightedRandomChoice(ageOptions).value;
   baseProbabilities.ageRange = optionsToProbMap(ageOptions);
 
-  // 3. 生成地区（独立）
-  const regionOptions = getDimensionOptions("region");
-  selectedValues.region = weightedRandomChoice(regionOptions).value;
-  baseProbabilities.region = optionsToProbMap(regionOptions);
-
-  // 4. 生成城市线级（独立）
+  // 3. 生成城市线级（提前，用于约束地区选择）
   const cityTierOptions = getDimensionOptions("cityTier");
   selectedValues.cityTier = weightedRandomChoice(cityTierOptions).value;
   baseProbabilities.cityTier = optionsToProbMap(cityTierOptions);
+
+  // 4. 生成地区（受城市线级约束）
+  // 如果城市线级被明确筛选（只有一种或几种特定值），则地区也要约束到有这些线级城市的地区
+  let regionOptions = getDimensionOptions("region");
+  const allowedCityTiers = (dimensionConfig as Record<string, string[]>).cityTier;
+  const isCityTierExplicitlyFiltered = allowedCityTiers && allowedCityTiers.length > 0 && allowedCityTiers.length < 5;
+
+  if (isCityTierExplicitlyFiltered) {
+    // 获取所有允许的城市线级对应的地区
+    const validRegions = new Set<string>();
+    for (const tier of allowedCityTiers) {
+      const regions = getRegionsWithCityTier(tier);
+      regions.forEach(r => validRegions.add(r));
+    }
+    // 只保留有对应城市线级的地区
+    regionOptions = regionOptions.filter(opt => validRegions.has(opt.value));
+    // 如果过滤后没有选项，恢复原始选项（防止空数组）
+    if (regionOptions.length === 0) {
+      regionOptions = getDimensionOptions("region");
+    }
+  }
+
+  selectedValues.region = weightedRandomChoice(regionOptions).value;
+  baseProbabilities.region = optionsToProbMap(regionOptions);
 
   // 5. 生成学历（依赖年龄）
   const educationOptions = getDimensionOptions("education");
@@ -386,7 +407,8 @@ export function generatePersona(
 
   // 构建角色对象
   const age = generateAge(selectedValues.ageRange);
-  const city = generateCity(selectedValues.region, selectedValues.cityTier);
+  // 如果城市线级被明确筛选，不允许城市fallback到其他线级
+  const city = generateCity(selectedValues.region, selectedValues.cityTier, !isCityTierExplicitlyFiltered);
   const income = generateIncome(selectedValues.incomeLevel);
 
   // 计算人群占比
