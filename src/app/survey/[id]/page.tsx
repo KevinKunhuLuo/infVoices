@@ -698,19 +698,19 @@ export default function SurveyDetailPage() {
                               </div>
 
                               {/* 人口分布图表网格 */}
-                              <div className="grid grid-cols-2 gap-3">
+                              <div className="grid grid-cols-2 gap-4">
                                 {previewDemographics.map((demo) => (
                                   <motion.div
                                     key={demo.dimension}
                                     initial={{ opacity: 0, scale: 0.95 }}
                                     animate={{ opacity: 1, scale: 1 }}
                                     transition={{ duration: 0.2 }}
-                                    className="bg-muted/30 rounded-lg p-2 border border-border/50"
+                                    className="bg-muted/30 rounded-lg px-4 py-3 border border-border/50"
                                   >
                                     <MiniPieChart
                                       data={demo.data}
                                       title={demo.label}
-                                      height={150}
+                                      height={160}
                                       interactive={true}
                                     />
                                   </motion.div>

@@ -326,12 +326,18 @@ export function PieChartComponent({
     ? height - titleHeight - legendHeight
     : height - titleHeight;
 
+  // 外部标签需要额外空间，不能使用 overflow-hidden
+  const needsOverflowVisible = externalLabels && showLabels;
+
   return (
-    <div className={cn("w-full overflow-hidden", className)} style={{ height }}>
+    <div
+      className={cn("w-full", !needsOverflowVisible && "overflow-hidden", className)}
+      style={{ height }}
+    >
       {title && (
         <h3 className="text-xs font-medium text-center mb-0.5 truncate px-2 text-muted-foreground">{title}</h3>
       )}
-      <ResponsiveContainer width="100%" height={chartHeight} className="overflow-hidden">
+      <ResponsiveContainer width="100%" height={chartHeight} className={cn(!needsOverflowVisible && "overflow-hidden")}>
         <RechartsPieChart>
           <Pie
             data={visibleData}
