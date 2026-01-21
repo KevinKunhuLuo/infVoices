@@ -448,3 +448,87 @@ export function MiniPieChart({
     />
   );
 }
+
+/**
+ * 水平布局饼图 - 左饼图右标签
+ * 专为紧凑空间设计，避免溢出问题
+ */
+export function HorizontalPieChart({
+  data,
+  title,
+  className,
+}: {
+  data: { name: string; value: number; color?: string }[];
+  title?: string;
+  className?: string;
+}) {
+  const total = useMemo(() => data.reduce((sum, d) => sum + d.value, 0), [data]);
+
+  const chartData = useMemo(() => {
+    return data.map((item, index) => ({
+      ...item,
+      fill: item.color || DEFAULT_COLORS[index % DEFAULT_COLORS.length],
+      percentage: total > 0 ? (item.value / total) * 100 : 0,
+    }));
+  }, [data, total]);
+
+  return (
+    <div className={cn("w-full", className)}>
+      {title && (
+        <h3 className="text-xs font-medium mb-2 text-muted-foreground">{title}</h3>
+      )}
+      <div className="flex items-center gap-3">
+        {/* 左侧：纯饼图 */}
+        <div className="shrink-0 w-16 h-16">
+          <ResponsiveContainer width="100%" height="100%">
+            <RechartsPieChart>
+              <Pie
+                data={chartData}
+                cx="50%"
+                cy="50%"
+                innerRadius={12}
+                outerRadius={28}
+                paddingAngle={chartData.length > 1 ? 2 : 0}
+                dataKey="value"
+                animationDuration={300}
+              >
+                {chartData.map((entry, index) => (
+                  <Cell
+                    key={`cell-${index}`}
+                    fill={entry.fill}
+                    stroke="var(--background)"
+                    strokeWidth={1}
+                  />
+                ))}
+              </Pie>
+              <Tooltip content={<CustomTooltip />} />
+            </RechartsPieChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* 右侧：标签列表 */}
+        <div className="flex-1 min-w-0 space-y-1">
+          {chartData.slice(0, 5).map((item, index) => (
+            <div key={index} className="flex items-center gap-2 text-xs">
+              <span
+                className="w-2 h-2 rounded-full shrink-0"
+                style={{ backgroundColor: item.fill }}
+              />
+              <span className="truncate text-muted-foreground flex-1 min-w-0">
+                {item.name}
+              </span>
+              <span className="font-medium tabular-nums shrink-0">
+                {item.percentage.toFixed(0)}%
+              </span>
+            </div>
+          ))}
+          {chartData.length > 5 && (
+            <div className="text-xs text-muted-foreground/60">
+              +{chartData.length - 5} 更多...
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

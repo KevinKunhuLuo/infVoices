@@ -32,7 +32,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { MiniPieChart } from "@/components/charts";
+import { HorizontalPieChart } from "@/components/charts";
 import {
   Tooltip,
   TooltipContent,
@@ -697,21 +697,19 @@ export default function SurveyDetailPage() {
                                 </span>
                               </div>
 
-                              {/* 人口分布图表网格 */}
-                              <div className="grid grid-cols-2 gap-4">
+                              {/* 人口分布图表列表 */}
+                              <div className="space-y-3">
                                 {previewDemographics.map((demo) => (
                                   <motion.div
                                     key={demo.dimension}
-                                    initial={{ opacity: 0, scale: 0.95 }}
-                                    animate={{ opacity: 1, scale: 1 }}
+                                    initial={{ opacity: 0, x: -10 }}
+                                    animate={{ opacity: 1, x: 0 }}
                                     transition={{ duration: 0.2 }}
-                                    className="bg-muted/30 rounded-lg px-4 py-3 border border-border/50"
+                                    className="bg-muted/30 rounded-lg px-3 py-2.5 border border-border/50"
                                   >
-                                    <MiniPieChart
+                                    <HorizontalPieChart
                                       data={demo.data}
                                       title={demo.label}
-                                      height={160}
-                                      interactive={true}
                                     />
                                   </motion.div>
                                 ))}
