@@ -9,6 +9,7 @@ import {
   FileBarChart,
   RefreshCw,
   AlertCircle,
+  AlertTriangle,
   Users,
   SlidersHorizontal,
   Info,
@@ -44,7 +45,7 @@ import { SurveyRunner } from "@/components/survey";
 import { AnalysisDashboard } from "@/components/dashboard";
 import { ExportDialog } from "@/components/export";
 import { generateAnalysisReport } from "@/lib/analysis";
-import { generatePersonas, allDimensions, audiencePresets, calculateSampleSize } from "@/lib/personas";
+import { generatePersonas, allDimensions, audiencePresets, calculateSampleSize, detectFilterConflicts } from "@/lib/personas";
 import { staggerContainer, staggerItem } from "@/lib/motion";
 import type { Survey } from "@/lib/survey";
 import type { Persona, DimensionConfig } from "@/lib/supabase";
@@ -91,6 +92,11 @@ export default function SurveyDetailPage() {
   // 计算当前活跃的筛选数量
   const activeFilterCount = useMemo(() => {
     return Object.values(audienceFilters).filter((v) => v && v.length > 0).length;
+  }, [audienceFilters]);
+
+  // 检测筛选条件冲突
+  const filterConflicts = useMemo(() => {
+    return detectFilterConflicts(audienceFilters as Record<string, string[]>);
   }, [audienceFilters]);
 
   // 实时生成预览样本（带防抖）
@@ -567,6 +573,31 @@ export default function SurveyDetailPage() {
                                     </div>
                                   </div>
                                 ))}
+
+                                {/* 冲突警告 */}
+                                {filterConflicts.length > 0 && (
+                                  <div className="space-y-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800">
+                                    <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
+                                      <AlertTriangle className="h-4 w-4" />
+                                      <span className="text-sm font-medium">
+                                        检测到 {filterConflicts.filter(c => c.type === 'impossible').length} 个冲突
+                                      </span>
+                                    </div>
+                                    <ul className="text-xs text-amber-600 dark:text-amber-500 space-y-1">
+                                      {filterConflicts.slice(0, 3).map((conflict, i) => (
+                                        <li key={i}>• {conflict.message}</li>
+                                      ))}
+                                      {filterConflicts.length > 3 && (
+                                        <li className="text-muted-foreground">
+                                          还有 {filterConflicts.length - 3} 个冲突...
+                                        </li>
+                                      )}
+                                    </ul>
+                                    <p className="text-xs text-muted-foreground">
+                                      冲突的筛选条件会导致生成结果不符合预期
+                                    </p>
+                                  </div>
+                                )}
 
                                 <div className="flex gap-2 pt-4">
                                   <Button

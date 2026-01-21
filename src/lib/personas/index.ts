@@ -33,4 +33,8 @@ export {
 } from "./generator";
 
 // 条件概率导出
-export { dataSourceNotes } from "./conditional-probabilities";
+export {
+  dataSourceNotes,
+  detectFilterConflicts,
+  type FilterConflict,
+} from "./conditional-probabilities";

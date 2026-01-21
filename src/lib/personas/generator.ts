@@ -30,6 +30,9 @@ import {
   estimatePopulationShare,
   formatPopulationShare,
   dataSourceNotes,
+  getValidOccupationsForAge,
+  getValidFamilyStatusesForAge,
+  getValidIncomeLevelsForOccupation,
 } from "./conditional-probabilities";
 
 // ============================================
@@ -353,9 +356,24 @@ export function generatePersona(
   );
 
   // 6. 生成职业（依赖年龄、学历）
-  const occupationOptions = getDimensionOptions("occupation");
+  let occupationOptions = getDimensionOptions("occupation");
   const ageOccupationProbs = ageToOccupation[ageRange] || {};
   const educationModifier = educationOccupationModifier[selectedValues.education] || {};
+
+  // 如果年龄被明确筛选，约束职业选项到该年龄段有效的职业
+  const allowedAgeRanges = (dimensionConfig as Record<string, string[]>).ageRange;
+  if (allowedAgeRanges && allowedAgeRanges.length > 0 && allowedAgeRanges.length < 6) {
+    // 获取所有允许的年龄段的有效职业
+    const validOccupations = new Set<string>();
+    for (const age of allowedAgeRanges) {
+      getValidOccupationsForAge(age).forEach(occ => validOccupations.add(occ));
+    }
+    // 过滤职业选项
+    const filteredOptions = occupationOptions.filter(opt => validOccupations.has(opt.value));
+    if (filteredOptions.length > 0) {
+      occupationOptions = filteredOptions;
+    }
+  }
 
   // 应用学历修正因子
   const modifiedOccupationProbs: Record<string, number> = {};
@@ -372,10 +390,25 @@ export function generatePersona(
   );
 
   // 7. 生成收入（依赖城市、职业）
-  const incomeLevelOptions = getDimensionOptions("incomeLevel");
+  let incomeLevelOptions = getDimensionOptions("incomeLevel");
   const cityTier = selectedValues.cityTier;
   const cityIncomeProbs = cityTierToIncome[cityTier] || {};
   const occupationModifier = occupationIncomeModifier[selectedValues.occupation] || {};
+
+  // 如果职业被明确筛选，约束收入选项到该职业有效的收入水平
+  const allowedOccupations = (dimensionConfig as Record<string, string[]>).occupation;
+  if (allowedOccupations && allowedOccupations.length > 0 && allowedOccupations.length < 10) {
+    // 获取所有允许的职业的有效收入水平
+    const validIncomeLevels = new Set<string>();
+    for (const occ of allowedOccupations) {
+      getValidIncomeLevelsForOccupation(occ).forEach(inc => validIncomeLevels.add(inc));
+    }
+    // 过滤收入选项
+    const filteredOptions = incomeLevelOptions.filter(opt => validIncomeLevels.has(opt.value));
+    if (filteredOptions.length > 0) {
+      incomeLevelOptions = filteredOptions;
+    }
+  }
 
   // 合并城市和职业对收入的影响
   const modifiedIncomeProbs: Record<string, number> = {};
@@ -392,8 +425,23 @@ export function generatePersona(
   );
 
   // 8. 生成家庭状态（依赖年龄）
-  const familyStatusOptions = getDimensionOptions("familyStatus");
+  let familyStatusOptions = getDimensionOptions("familyStatus");
   const ageFamilyProbs = ageToFamilyStatus[ageRange] || {};
+
+  // 如果年龄被明确筛选，约束家庭状态选项到该年龄段有效的状态
+  if (allowedAgeRanges && allowedAgeRanges.length > 0 && allowedAgeRanges.length < 6) {
+    // 获取所有允许的年龄段的有效家庭状态
+    const validFamilyStatuses = new Set<string>();
+    for (const age of allowedAgeRanges) {
+      getValidFamilyStatusesForAge(age).forEach(status => validFamilyStatuses.add(status));
+    }
+    // 过滤家庭状态选项
+    const filteredOptions = familyStatusOptions.filter(opt => validFamilyStatuses.has(opt.value));
+    if (filteredOptions.length > 0) {
+      familyStatusOptions = filteredOptions;
+    }
+  }
+
   const familyAllowedValues = familyStatusOptions.map(o => o.value);
   const filteredAgeFamilyProbs: Record<string, number> = {};
   for (const v of familyAllowedValues) {

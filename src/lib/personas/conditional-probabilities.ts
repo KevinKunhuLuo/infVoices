@@ -589,3 +589,192 @@ export function formatPopulationShare(share: number): string {
     return `<0.01%`;
   }
 }
+
+// ============================================
+// 筛选冲突检测
+// ============================================
+
+export interface FilterConflict {
+  type: 'impossible' | 'unlikely';
+  dimension1: string;
+  value1: string;
+  dimension2: string;
+  value2: string;
+  probability: number;
+  message: string;
+}
+
+/**
+ * 检测筛选条件之间的冲突
+ */
+export function detectFilterConflicts(
+  dimensionConfig: Record<string, string[]>
+): FilterConflict[] {
+  const conflicts: FilterConflict[] = [];
+
+  const ageRanges = dimensionConfig.ageRange || [];
+  const occupations = dimensionConfig.occupation || [];
+  const familyStatuses = dimensionConfig.familyStatus || [];
+  const incomeLevels = dimensionConfig.incomeLevel || [];
+
+  // 1. 年龄 + 职业 冲突检测
+  for (const age of ageRanges) {
+    for (const occ of occupations) {
+      const prob = ageToOccupation[age]?.[occ] ?? 0;
+      if (prob === 0) {
+        conflicts.push({
+          type: 'impossible',
+          dimension1: 'ageRange',
+          value1: age,
+          dimension2: 'occupation',
+          value2: occ,
+          probability: 0,
+          message: getAgeOccupationConflictMessage(age, occ),
+        });
+      }
+    }
+  }
+
+  // 2. 年龄 + 家庭状态 冲突检测
+  for (const age of ageRanges) {
+    for (const family of familyStatuses) {
+      const prob = ageToFamilyStatus[age]?.[family] ?? 0;
+      if (prob === 0) {
+        conflicts.push({
+          type: 'impossible',
+          dimension1: 'ageRange',
+          value1: age,
+          dimension2: 'familyStatus',
+          value2: family,
+          probability: 0,
+          message: getAgeFamilyConflictMessage(age, family),
+        });
+      }
+    }
+  }
+
+  // 3. 职业 + 收入 冲突检测
+  for (const occ of occupations) {
+    for (const income of incomeLevels) {
+      const modifier = occupationIncomeModifier[occ]?.[income] ?? 1;
+      if (modifier === 0) {
+        conflicts.push({
+          type: 'impossible',
+          dimension1: 'occupation',
+          value1: occ,
+          dimension2: 'incomeLevel',
+          value2: income,
+          probability: 0,
+          message: getOccupationIncomeConflictMessage(occ, income),
+        });
+      } else if (modifier < 0.15) {
+        conflicts.push({
+          type: 'unlikely',
+          dimension1: 'occupation',
+          value1: occ,
+          dimension2: 'incomeLevel',
+          value2: income,
+          probability: modifier,
+          message: getOccupationIncomeConflictMessage(occ, income),
+        });
+      }
+    }
+  }
+
+  return conflicts;
+}
+
+function getAgeOccupationConflictMessage(age: string, occupation: string): string {
+  const ageLabels: Record<string, string> = {
+    '18-24': '18-24岁',
+    '25-34': '25-34岁',
+    '35-44': '35-44岁',
+    '45-54': '45-54岁',
+    '55-64': '55-64岁',
+    '65+': '65岁以上',
+  };
+  const occLabels: Record<string, string> = {
+    student: '学生',
+    retired: '退休',
+    internet: '互联网',
+    finance: '金融',
+    education: '教育',
+    healthcare: '医疗',
+    manufacturing: '制造业',
+    service: '服务业',
+    government: '公务员',
+    freelance: '自由职业',
+  };
+  return `${ageLabels[age] || age}人群中几乎不存在${occLabels[occupation] || occupation}`;
+}
+
+function getAgeFamilyConflictMessage(age: string, family: string): string {
+  const ageLabels: Record<string, string> = {
+    '18-24': '18-24岁',
+    '25-34': '25-34岁',
+    '35-44': '35-44岁',
+    '45-54': '45-54岁',
+    '55-64': '55-64岁',
+    '65+': '65岁以上',
+  };
+  const familyLabels: Record<string, string> = {
+    single: '单身',
+    couple: '情侣/新婚',
+    marriedNoKids: '已婚无孩',
+    marriedWithKids: '已婚有孩',
+    emptyNest: '空巢',
+  };
+  return `${ageLabels[age] || age}人群中几乎不存在${familyLabels[family] || family}状态`;
+}
+
+function getOccupationIncomeConflictMessage(occupation: string, income: string): string {
+  const occLabels: Record<string, string> = {
+    student: '学生',
+    retired: '退休',
+    internet: '互联网',
+    finance: '金融',
+    education: '教育',
+    healthcare: '医疗',
+    manufacturing: '制造业',
+    service: '服务业',
+    government: '公务员',
+    freelance: '自由职业',
+  };
+  const incomeLabels: Record<string, string> = {
+    low: '低收入',
+    medium: '中等收入',
+    mediumHigh: '中高收入',
+    high: '高收入',
+  };
+  return `${occLabels[occupation] || occupation}很少有${incomeLabels[income] || income}`;
+}
+
+/**
+ * 获取指定年龄段可能的职业列表
+ */
+export function getValidOccupationsForAge(ageRange: string): string[] {
+  const probs = ageToOccupation[ageRange] || {};
+  return Object.entries(probs)
+    .filter(([_, prob]) => prob > 0)
+    .map(([occ, _]) => occ);
+}
+
+/**
+ * 获取指定年龄段可能的家庭状态列表
+ */
+export function getValidFamilyStatusesForAge(ageRange: string): string[] {
+  const probs = ageToFamilyStatus[ageRange] || {};
+  return Object.entries(probs)
+    .filter(([_, prob]) => prob > 0)
+    .map(([status, _]) => status);
+}
+
+/**
+ * 获取指定职业可能的收入水平列表
+ */
+export function getValidIncomeLevelsForOccupation(occupation: string): string[] {
+  const modifiers = occupationIncomeModifier[occupation] || {};
+  return Object.entries(modifiers)
+    .filter(([_, modifier]) => modifier > 0)
+    .map(([income, _]) => income);
+}

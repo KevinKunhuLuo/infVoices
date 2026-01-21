@@ -11,6 +11,7 @@ import {
   Info,
   ChevronDown,
   ChevronUp,
+  AlertTriangle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -39,6 +40,7 @@ import {
   allDimensions,
   audiencePresets,
   getDataSourceNotes,
+  detectFilterConflicts,
 } from "@/lib/personas";
 import { staggerContainer, staggerItem, fadeInUp } from "@/lib/motion";
 import type { Persona, DimensionConfig } from "@/lib/supabase";
@@ -83,6 +85,11 @@ export default function PersonasPage() {
         p.region.toLowerCase().includes(query)
     );
   }, [personas, searchQuery]);
+
+  // 检测筛选条件冲突
+  const filterConflicts = useMemo(() => {
+    return detectFilterConflicts(filters as Record<string, string[]>);
+  }, [filters]);
 
   // 重新生成角色
   const handleRegenerate = () => {
@@ -290,6 +297,31 @@ export default function PersonasPage() {
                   </div>
                 </div>
               ))}
+
+              {/* 冲突警告 */}
+              {filterConflicts.length > 0 && (
+                <div className="space-y-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800">
+                  <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
+                    <AlertTriangle className="h-4 w-4" />
+                    <span className="text-sm font-medium">
+                      检测到 {filterConflicts.filter(c => c.type === 'impossible').length} 个冲突
+                    </span>
+                  </div>
+                  <ul className="text-xs text-amber-600 dark:text-amber-500 space-y-1">
+                    {filterConflicts.slice(0, 3).map((conflict, i) => (
+                      <li key={i}>• {conflict.message}</li>
+                    ))}
+                    {filterConflicts.length > 3 && (
+                      <li className="text-muted-foreground">
+                        还有 {filterConflicts.length - 3} 个冲突...
+                      </li>
+                    )}
+                  </ul>
+                  <p className="text-xs text-muted-foreground">
+                    冲突的筛选条件会导致生成结果不符合预期
+                  </p>
+                </div>
+              )}
 
               <div className="flex gap-2 pt-4">
                 <Button
