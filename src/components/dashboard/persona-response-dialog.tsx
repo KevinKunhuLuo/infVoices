@@ -37,6 +37,12 @@ import type { ResponseEntry } from "@/lib/survey/executor";
 import type { Persona } from "@/lib/supabase";
 import type { SurveyAnswer } from "@/lib/llm";
 
+interface AnswerOption {
+  value: string;
+  label: string;
+  count: number;
+}
+
 interface PersonaResponseDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -45,6 +51,8 @@ interface PersonaResponseDialogProps {
   selectedAnswer?: string;
   selectedAnswerLabel?: string;
   responses: ResponseEntry[];
+  /** 问题的答案选项（用于筛选） */
+  answerOptions?: AnswerOption[];
 }
 
 // 人口学标签映射
@@ -242,18 +250,31 @@ export function PersonaResponseDialog({
   onOpenChange,
   questionId,
   questionTitle,
-  selectedAnswer,
-  selectedAnswerLabel,
+  selectedAnswer: initialSelectedAnswer,
+  selectedAnswerLabel: initialSelectedAnswerLabel,
   responses,
+  answerOptions = [],
 }: PersonaResponseDialogProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [filterDimension, setFilterDimension] = useState<string>("all");
   const [filterValue, setFilterValue] = useState<string>("all");
 
+  // 答案筛选状态
+  const [answerFilter, setAnswerFilter] = useState<string>("all");
+
   // 聊天状态
   const [chatOpen, setChatOpen] = useState(false);
   const [chatPersona, setChatPersona] = useState<Persona | null>(null);
   const [chatAnswer, setChatAnswer] = useState<SurveyAnswer | undefined>();
+
+  // 当对话框打开时，同步初始选中的答案
+  useMemo(() => {
+    if (open && initialSelectedAnswer !== undefined) {
+      setAnswerFilter(initialSelectedAnswer);
+    } else if (!open) {
+      setAnswerFilter("all");
+    }
+  }, [open, initialSelectedAnswer]);
 
   // 打开聊天对话框
   const handleOpenChat = (persona: Persona, answer?: SurveyAnswer) => {
@@ -261,6 +282,50 @@ export function PersonaResponseDialog({
     setChatAnswer(answer);
     setChatOpen(true);
   };
+
+  // 从响应中自动提取答案选项（如果没有传入）
+  const computedAnswerOptions = useMemo(() => {
+    if (answerOptions.length > 0) return answerOptions;
+
+    const answerCounts = new Map<string, { label: string; count: number }>();
+
+    responses.forEach((entry) => {
+      if (entry.status !== "completed" || !entry.response) return;
+      const answer = entry.response.answers.find((a) => a.questionId === questionId);
+      if (!answer) return;
+
+      const answerValue = answer.answer;
+      if (Array.isArray(answerValue)) {
+        answerValue.forEach((v) => {
+          const key = String(v);
+          const existing = answerCounts.get(key);
+          answerCounts.set(key, {
+            label: key,
+            count: (existing?.count || 0) + 1,
+          });
+        });
+      } else {
+        const key = String(answerValue);
+        const existing = answerCounts.get(key);
+        answerCounts.set(key, {
+          label: key,
+          count: (existing?.count || 0) + 1,
+        });
+      }
+    });
+
+    return Array.from(answerCounts.entries())
+      .map(([value, { label, count }]) => ({ value, label, count }))
+      .sort((a, b) => b.count - a.count);
+  }, [responses, questionId, answerOptions]);
+
+  // 当前选中的答案
+  const currentAnswerFilter = answerFilter;
+  const currentAnswerLabel = useMemo(() => {
+    if (currentAnswerFilter === "all") return null;
+    const option = computedAnswerOptions.find((o) => o.value === currentAnswerFilter);
+    return option?.label || currentAnswerFilter;
+  }, [currentAnswerFilter, computedAnswerOptions]);
 
   // 筛选出选择了指定答案的响应
   const filteredResponses = useMemo(() => {
@@ -270,13 +335,14 @@ export function PersonaResponseDialog({
       const answer = entry.response.answers.find((a) => a.questionId === questionId);
       if (!answer) return false;
 
-      // 如果指定了答案，筛选匹配的
-      if (selectedAnswer !== undefined) {
+      // 按答案筛选
+      if (currentAnswerFilter !== "all") {
         const answerValue = answer.answer;
         if (Array.isArray(answerValue)) {
-          return answerValue.includes(selectedAnswer);
+          if (!answerValue.includes(currentAnswerFilter)) return false;
+        } else {
+          if (String(answerValue) !== currentAnswerFilter) return false;
         }
-        return String(answerValue) === selectedAnswer;
       }
 
       return true;
@@ -291,25 +357,48 @@ export function PersonaResponseDialog({
     }
 
     return filtered;
-  }, [responses, questionId, selectedAnswer, filterDimension, filterValue]);
+  }, [responses, questionId, currentAnswerFilter, filterDimension, filterValue]);
 
-  // 获取可用的筛选值
+  // 获取可用的人口学筛选值
   const filterOptions = useMemo(() => {
     if (filterDimension === "all") return [];
 
     const values = new Set<string>();
-    filteredResponses.forEach((entry) => {
+    // 基于答案筛选后的响应计算可用的人口学值
+    const baseResponses = responses.filter((entry) => {
+      if (entry.status !== "completed" || !entry.response) return false;
+      const answer = entry.response.answers.find((a) => a.questionId === questionId);
+      if (!answer) return false;
+      if (currentAnswerFilter !== "all") {
+        const answerValue = answer.answer;
+        if (Array.isArray(answerValue)) {
+          if (!answerValue.includes(currentAnswerFilter)) return false;
+        } else {
+          if (String(answerValue) !== currentAnswerFilter) return false;
+        }
+      }
+      return true;
+    });
+
+    baseResponses.forEach((entry) => {
       const persona = entry.persona as unknown as Record<string, string>;
       const value = persona[filterDimension];
       if (value) values.add(value);
     });
 
     return Array.from(values).sort();
-  }, [filterDimension, responses, questionId, selectedAnswer]);
+  }, [filterDimension, responses, questionId, currentAnswerFilter]);
 
-  // 重置筛选
+  // 重置人口学筛选
   const handleDimensionChange = (dim: string) => {
     setFilterDimension(dim);
+    setFilterValue("all");
+  };
+
+  // 重置所有筛选
+  const handleClearAll = () => {
+    setAnswerFilter("all");
+    setFilterDimension("all");
     setFilterValue("all");
   };
 
@@ -323,61 +412,97 @@ export function PersonaResponseDialog({
             </span>
             {questionTitle}
           </DialogTitle>
-          {selectedAnswerLabel && (
-            <div className="mt-2">
+          <div className="mt-2 flex items-center flex-wrap gap-2">
+            {currentAnswerLabel && (
               <Badge className="bg-primary/10 text-primary hover:bg-primary/10">
-                选择: {selectedAnswerLabel}
+                答案: {currentAnswerLabel}
               </Badge>
-              <span className="ml-2 text-sm text-muted-foreground">
-                共 {filteredResponses.length} 人
-              </span>
-            </div>
-          )}
+            )}
+            {filterDimension !== "all" && filterValue !== "all" && (
+              <Badge variant="secondary">
+                {DEMOGRAPHIC_LABELS[filterDimension]}: {filterValue}
+              </Badge>
+            )}
+            <span className="text-sm text-muted-foreground">
+              共 {filteredResponses.length} 人
+            </span>
+          </div>
         </DialogHeader>
 
         {/* 筛选器 */}
-        <div className="flex items-center gap-3 py-3 border-b">
-          <span className="text-sm text-muted-foreground">筛选:</span>
-          <Select value={filterDimension} onValueChange={handleDimensionChange}>
-            <SelectTrigger className="w-32 h-8">
-              <SelectValue placeholder="选择维度" />
-            </SelectTrigger>
-            <SelectContent className="max-h-60">
-              <SelectItem value="all">全部</SelectItem>
-              {Object.entries(DEMOGRAPHIC_LABELS).map(([key, label]) => (
-                <SelectItem key={key} value={key}>
-                  {label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <div className="flex flex-wrap items-center gap-3 py-3 border-b">
+          {/* 答案筛选 */}
+          {computedAnswerOptions.length > 0 && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">答案:</span>
+              <Select value={answerFilter} onValueChange={setAnswerFilter}>
+                <SelectTrigger className="w-36 h-8">
+                  <SelectValue placeholder="选择答案" />
+                </SelectTrigger>
+                <SelectContent className="max-h-60">
+                  <SelectItem value="all">全部答案</SelectItem>
+                  {computedAnswerOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      <span className="truncate max-w-[120px] inline-block align-bottom">
+                        {option.label}
+                      </span>
+                      <span className="text-muted-foreground ml-1">({option.count})</span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
-          {filterDimension !== "all" && (
-            <Select value={filterValue} onValueChange={setFilterValue}>
-              <SelectTrigger className="w-32 h-8">
-                <SelectValue placeholder="选择值" />
+          {/* 分隔符 */}
+          {computedAnswerOptions.length > 0 && (
+            <div className="h-4 w-px bg-border" />
+          )}
+
+          {/* 人口学筛选 */}
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">画像:</span>
+            <Select value={filterDimension} onValueChange={handleDimensionChange}>
+              <SelectTrigger className="w-28 h-8">
+                <SelectValue placeholder="选择维度" />
               </SelectTrigger>
               <SelectContent className="max-h-60">
                 <SelectItem value="all">全部</SelectItem>
-                {filterOptions.map((value) => (
-                  <SelectItem key={value} value={value}>
-                    {value}
+                {Object.entries(DEMOGRAPHIC_LABELS).map(([key, label]) => (
+                  <SelectItem key={key} value={key}>
+                    {label}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-          )}
 
-          {(filterDimension !== "all" || filterValue !== "all") && (
+            {filterDimension !== "all" && (
+              <Select value={filterValue} onValueChange={setFilterValue}>
+                <SelectTrigger className="w-28 h-8">
+                  <SelectValue placeholder="选择值" />
+                </SelectTrigger>
+                <SelectContent className="max-h-60">
+                  <SelectItem value="all">全部</SelectItem>
+                  {filterOptions.map((value) => (
+                    <SelectItem key={value} value={value}>
+                      {value}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+
+          {/* 清除按钮 */}
+          {(answerFilter !== "all" || filterDimension !== "all" || filterValue !== "all") && (
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => {
-                setFilterDimension("all");
-                setFilterValue("all");
-              }}
+              onClick={handleClearAll}
+              className="h-8 px-2"
             >
-              清除
+              <X className="h-3 w-3 mr-1" />
+              清除筛选
             </Button>
           )}
         </div>

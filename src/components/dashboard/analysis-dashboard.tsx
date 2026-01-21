@@ -612,6 +612,11 @@ function QuestionAnalysisCard({
           selectedAnswer={selectedAnswer}
           selectedAnswerLabel={selectedAnswerLabel}
           responses={responses}
+          answerOptions={stats.distribution.map((d) => ({
+            value: d.value,
+            label: d.label,
+            count: d.count,
+          }))}
         />
       )}
     </motion.div>
