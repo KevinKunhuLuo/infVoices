@@ -15,6 +15,7 @@ import {
   Loader2,
   PieChart as PieChartIcon,
   Sparkles,
+  Pencil,
 } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
@@ -367,12 +368,20 @@ export default function SurveyDetailPage() {
               </p>
             </div>
           </div>
-          {report && (
-            <Button variant="outline" onClick={handleReset} className="gap-2">
-              <RefreshCw className="h-4 w-4" />
-              重新开始
+          <div className="flex items-center gap-2">
+            <Button variant="outline" asChild className="gap-2">
+              <Link href={`/survey/${surveyId}/edit`}>
+                <Pencil className="h-4 w-4" />
+                编辑问卷
+              </Link>
             </Button>
-          )}
+            {report && (
+              <Button variant="outline" onClick={handleReset} className="gap-2">
+                <RefreshCw className="h-4 w-4" />
+                重新开始
+              </Button>
+            )}
+          </div>
         </motion.div>
 
         {/* 主要内容 */}

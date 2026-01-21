@@ -298,7 +298,9 @@ export default function HomePage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem>编辑</DropdownMenuItem>
+                          <DropdownMenuItem asChild>
+                            <Link href={`/survey/${project.id}/edit`}>编辑</Link>
+                          </DropdownMenuItem>
                           <DropdownMenuItem>复制</DropdownMenuItem>
                           <DropdownMenuItem
                             className="text-destructive"
