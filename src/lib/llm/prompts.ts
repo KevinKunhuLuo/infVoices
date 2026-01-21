@@ -58,14 +58,14 @@ ${persona.traits && persona.traits.length > 0 ? `**性格特点**\n${persona.tra
 }
 \`\`\`
 
-### 不同题型的 answer 格式
+### 不同题型的 answer 格式（务必严格遵守）
 
 - **单选题 (single_choice)**：选项的 value 值，如 "option_1"
 - **多选题 (multiple_choice)**：选项 value 值的数组，如 ["option_1", "option_3"]
 - **量表题 (scale)**：数字，如 4
 - **开放文本 (open_text)**：文字回答字符串
-- **图片对比 (image_compare)**：选中图片的标识，如 "image_0"。注意：你只能看到图片的文字描述，请根据描述做出符合你角色特征的选择
-- **概念测试 (concept_test)**：各维度评分的对象，如 {"dim1": 4, "dim2": 3}`;
+- **图片对比 (image_compare)**：必须返回 "image_0" 或 "image_1" 或 "image_2" 等格式（从0开始的索引）。注意：你只能看到图片的文字描述，请根据描述做出符合你角色特征的选择
+- **概念测试 (concept_test)**：各维度评分的对象，键名使用维度名称，如 {"整体喜好度": 4, "购买意愿": 3}。每个维度都必须给出评分`;
 }
 
 /**
@@ -135,11 +135,15 @@ function formatQuestion(question: SurveyQuestion, index: number): string {
           text += `\n**概念描述**：${question.conceptConfig.conceptDescription}`;
         }
         if (question.conceptConfig.dimensions.length > 0) {
-          text += `\n**评估维度**：`;
+          text += `\n**评估维度**（请使用维度名称作为键名返回评分）：`;
           question.conceptConfig.dimensions.forEach((dim) => {
             const scale = dim.scaleConfig || { min: 1, max: 5 };
-            text += `\n  - ${dim.id}: ${dim.name} (${scale.min}-${scale.max})`;
+            text += `\n  - "${dim.name}": ${scale.min}-${scale.max}分`;
+            if (scale.minLabel) text += `（${scale.min}=${scale.minLabel}`;
+            if (scale.maxLabel) text += `，${scale.max}=${scale.maxLabel}）`;
+            else if (scale.minLabel) text += `）`;
           });
+          text += `\n**返回格式示例**：{"${question.conceptConfig.dimensions[0]?.name || '维度1'}": 4, ...}`;
         }
       }
       break;

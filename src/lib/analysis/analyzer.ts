@@ -562,6 +562,7 @@ function analyzeOpenTextQuestion(
 
 /**
  * 分析图片对比题
+ * 支持多种答案格式: "image_0", "image_1", 图片URL, 或图片描述
  */
 function analyzeImageCompareQuestion(
   question: SurveyQuestion,
@@ -569,24 +570,55 @@ function analyzeImageCompareQuestion(
   baseStats: AnswerStatistics
 ): AnswerStatistics {
   const images = question.images || [];
-  const counts: Record<string, number> = {};
+  const counts: number[] = images.map(() => 0);
 
-  // 使用 url 作为标识符
-  images.forEach((img) => {
-    counts[img.url] = 0;
-  });
+  // 创建多种匹配方式的映射
+  const matchPatterns = images.map((img, index) => ({
+    index,
+    patterns: [
+      `image_${index}`,                          // LLM 返回格式
+      `image${index}`,                           // 无下划线格式
+      `图片${index + 1}`,                        // 中文格式
+      `图片 ${index + 1}`,                       // 中文带空格
+      img.url,                                   // 完整 URL
+      img.caption?.toLowerCase(),                // 图片描述（小写）
+      img.alt?.toLowerCase(),                    // alt 文本（小写）
+    ].filter(Boolean) as string[],
+  }));
 
   answers.forEach((answer) => {
-    if (typeof answer === "string" && counts[answer] !== undefined) {
-      counts[answer]++;
+    if (typeof answer !== "string") return;
+
+    const normalizedAnswer = answer.toLowerCase().trim();
+
+    // 尝试匹配各种模式
+    for (const { index, patterns } of matchPatterns) {
+      if (patterns.some((p) => normalizedAnswer === p.toLowerCase() || normalizedAnswer.includes(p.toLowerCase()))) {
+        counts[index]++;
+        return; // 找到匹配就退出
+      }
+    }
+
+    // 尝试从答案中提取数字索引 (如 "我选择第1张图片")
+    const numMatch = answer.match(/(\d+)/);
+    if (numMatch) {
+      const num = parseInt(numMatch[1], 10);
+      // 检查是否是 0-indexed 或 1-indexed
+      if (num >= 0 && num < images.length) {
+        counts[num]++;
+      } else if (num >= 1 && num <= images.length) {
+        counts[num - 1]++;
+      }
     }
   });
 
+  const total = counts.reduce((a, b) => a + b, 0);
+
   const distribution: AnswerDistribution[] = images.map((img, index) => ({
-    value: img.url,
+    value: `image_${index}`,
     label: img.caption || img.alt || `图片 ${index + 1}`,
-    count: counts[img.url] || 0,
-    percentage: answers.length > 0 ? ((counts[img.url] || 0) / answers.length) * 100 : 0,
+    count: counts[index],
+    percentage: total > 0 ? (counts[index] / total) * 100 : 0,
     color: CHART_COLORS.primary[index % CHART_COLORS.primary.length],
   }));
 
@@ -598,6 +630,7 @@ function analyzeImageCompareQuestion(
 
 /**
  * 分析概念测试题
+ * 支持多种维度键名格式: 维度ID, 维度名称, dim1/dim2 简化格式
  */
 function analyzeConceptTestQuestion(
   question: SurveyQuestion,
@@ -605,37 +638,73 @@ function analyzeConceptTestQuestion(
   baseStats: AnswerStatistics
 ): AnswerStatistics {
   const dimensions = question.conceptConfig?.dimensions || [];
-  const dimensionScores: Record<string, number[]> = {};
+  const dimensionScores: number[][] = dimensions.map(() => []);
 
-  dimensions.forEach((dim) => {
-    dimensionScores[dim.id] = [];
-  });
+  // 创建维度匹配映射
+  const dimensionMatchers = dimensions.map((dim, index) => ({
+    index,
+    patterns: [
+      dim.id,                               // 完整 ID (可能是 UUID)
+      dim.id.toLowerCase(),                  // 小写 ID
+      dim.name,                             // 维度名称
+      dim.name.toLowerCase(),               // 小写名称
+      `dim${index + 1}`,                    // dim1, dim2 格式
+      `dim_${index + 1}`,                   // dim_1 格式
+      `dimension${index + 1}`,              // dimension1 格式
+      `d${index + 1}`,                      // d1, d2 简化格式
+      `${index + 1}`,                       // 纯数字
+    ],
+  }));
 
   // 收集每个维度的分数
   answers.forEach((answer) => {
-    if (typeof answer === "object" && answer !== null) {
-      const answerObj = answer as Record<string, number>;
-      Object.entries(answerObj).forEach(([dimId, score]) => {
-        if (dimensionScores[dimId] && typeof score === "number") {
-          dimensionScores[dimId].push(score);
+    if (typeof answer !== "object" || answer === null) return;
+
+    const answerObj = answer as Record<string, unknown>;
+
+    Object.entries(answerObj).forEach(([key, value]) => {
+      // 确保是数值
+      const score = typeof value === "number" ? value : parseFloat(String(value));
+      if (isNaN(score)) return;
+
+      const normalizedKey = key.toLowerCase().trim();
+
+      // 尝试匹配各维度
+      for (const { index, patterns } of dimensionMatchers) {
+        if (patterns.some((p) => normalizedKey === p.toLowerCase())) {
+          dimensionScores[index].push(score);
+          return;
         }
-      });
-    }
+      }
+
+      // 如果没有精确匹配，尝试模糊匹配（包含维度名称）
+      for (const { index } of dimensionMatchers) {
+        const dim = dimensions[index];
+        if (normalizedKey.includes(dim.name.toLowerCase()) ||
+            dim.name.toLowerCase().includes(normalizedKey)) {
+          dimensionScores[index].push(score);
+          return;
+        }
+      }
+    });
   });
 
   // 计算每个维度的平均分
   const distribution: AnswerDistribution[] = dimensions.map((dim, index) => {
-    const scores = dimensionScores[dim.id] || [];
+    const scores = dimensionScores[index];
     const avgScore =
       scores.length > 0
         ? scores.reduce((a, b) => a + b, 0) / scores.length
         : 0;
 
+    // 获取量表最大值用于计算百分比
+    const maxScale = dim.scaleConfig?.max || 5;
+
     return {
       value: dim.id,
       label: dim.name,
       count: scores.length,
-      percentage: avgScore * 20, // 转换为百分比（假设5分制）
+      percentage: maxScale > 0 ? (avgScore / maxScale) * 100 : 0, // 转换为百分比
       color: CHART_COLORS.primary[index % CHART_COLORS.primary.length],
     };
   });
